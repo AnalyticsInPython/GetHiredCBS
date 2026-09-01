@@ -13,6 +13,7 @@ database/
 
 - **`companies`** — keyed by company **name** (not a surrogate id), so alumni rows and future API-enrichment data can both join on it directly.
 - **`alumni`** — keyed by `email`; one row per grad, with `summer_company` and `ft_employer` as foreign keys into `companies`.
+- **`job_postings`** — cached [Adzuna](https://developer.adzuna.com/) job ads per company, keyed by `company` (references `companies.name`). Populated on demand by `backend`'s `GET /api/companies/{company}/jobs`, not by this loader — see [backend/README.md](../backend/README.md#apicompaniescompanyjobs--adzuna-job-ads-on-demand).
 
 Blank cells and the roster's `#N/A` placeholders are both normalized to `NULL` on load.
 

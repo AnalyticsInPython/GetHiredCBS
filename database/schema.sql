@@ -29,3 +29,27 @@ CREATE TABLE IF NOT EXISTS alumni (
 
 CREATE INDEX IF NOT EXISTS idx_alumni_summer_company ON alumni (summer_company);
 CREATE INDEX IF NOT EXISTS idx_alumni_ft_employer ON alumni (ft_employer);
+
+-- Cached results from the Adzuna Jobs API (/jobs/{country}/search/{page}),
+-- fetched on demand when a user opens a company's detail view — never on a
+-- schedule. All rows for a given company share one fetched_at, written by
+-- whichever request triggered that fetch; the backend reuses those rows
+-- for CACHE_TTL_DAYS before calling Adzuna again, since the free tier caps
+-- out at 25 hits/minute and 250/day.
+CREATE TABLE IF NOT EXISTS job_postings (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    company         TEXT NOT NULL REFERENCES companies (name),
+    adzuna_id       TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    description     TEXT,
+    redirect_url    TEXT,
+    location        TEXT,
+    salary_min      REAL,
+    salary_max      REAL,
+    contract_time   TEXT,
+    contract_type   TEXT,
+    created         TEXT,
+    fetched_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_postings_company ON job_postings (company);
