@@ -96,3 +96,50 @@ nav a:hover {
   font-size: 0.9rem;
   margin-top: 1.5rem;
 }
+
+#jobs-section {
+  margin-top: 2rem;
+  max-width: 640px;
+}
+
+#jobs-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.job-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.job-card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.job-title {
+  font-weight: 600;
+}
+
+.job-meta {
+  color: #555;
+  font-size: 0.85rem;
+  margin-top: 0.15rem;
+}
+
+.job-apply {
+  display: inline-block;
+  margin-top: 0.4rem;
+  color: #1a56b0;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.job-apply:hover {
+  text-decoration: underline;
+}
