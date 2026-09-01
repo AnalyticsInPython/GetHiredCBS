@@ -1,0 +1,16 @@
+[project]
+name = "excel-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Mira Hout", email = "MHout28@gsb.columbia.edu" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "faker>=40.37.0",
+    "openpyxl>=3.1.5",
+]
+
+[tool.uv]
+package = false
