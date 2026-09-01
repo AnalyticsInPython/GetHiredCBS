@@ -1,14 +1,27 @@
 # database
 
-MySQL schema, migrations, and seed data for the normalized `alumni` / `companies` / `roles` / `job_postings` model described in [Proposal.md](../Proposal.md). Populated by the `backend` ETL pipeline.
-
-Planned scaffold:
+**SQLite** schema and loader for the normalized model described in [Proposal.md](../Proposal.md). Currently loads the CBS alumni roster from [`grad-roster-excel/grad_roster.xlsx`](../grad-roster-excel/grad_roster.xlsx); enrichment tables (job postings, firmographics) will extend this schema as the `backend` ETL pipeline grows.
 
 ```
 database/
-├── schema.sql          # canonical table definitions
-├── migrations/          # incremental schema changes
-└── seed/                 # sample/seed data for local dev
+├── schema.sql               # canonical table definitions
+└── seed/
+    └── load_grad_roster.py   # reads grad_roster.xlsx → builds gethiredcbs.db
 ```
 
-Not yet scaffolded — see the root [README.md](../README.md) for overall architecture.
+## Schema
+
+- **`companies`** — keyed by company **name** (not a surrogate id), so alumni rows and future API-enrichment data can both join on it directly.
+- **`alumni`** — keyed by `email`; one row per grad, with `summer_company` and `ft_employer` as foreign keys into `companies`.
+
+Blank cells and the roster's `#N/A` placeholders are both normalized to `NULL` on load.
+
+## Usage
+
+From the repo root:
+
+```sh
+uv run database/seed/load_grad_roster.py
+```
+
+This applies `schema.sql` and (re)builds `database/gethiredcbs.db` from the current spreadsheet — safe to re-run. The `.db` file itself is gitignored (`*.db`); only the schema and loader are tracked here.

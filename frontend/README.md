@@ -1,36 +1,9 @@
 # frontend
 
-Vue 3 + TypeScript single-page app (search/filter UI, results, company and alumni detail views). Talks to the `backend` REST API.
+Right now: a plain HTML/CSS/JS starting point — `index.html`, `app.js`, `style.css` — served directly by the FastAPI app in `backend/` (no build step, no framework). It fetches `/api/alumni` and renders the roster into a filterable table.
 
-## Stack
+This is intentionally minimal, just to get frontend → backend → database working end to end. The plan is still Vue 3 + TypeScript (see [Proposal.md](../Proposal.md) and the root [README.md](../README.md)) once there's more UI to justify it — swap this folder's contents for a proper Vite + Vue build when that happens; `backend/app/main.py`'s static mount doesn't care what's inside `frontend/`, just that `index.html` exists there.
 
-- **[Vue 3](https://vuejs.org/)** + **TypeScript**, scaffolded with [create-vue](https://github.com/vuejs/create-vue) (Vite-based)
-- **[PrimeVue](https://primevue.org/)** (v4, Aura theme) for UI components
-- **ESLint** (flat config, `eslint.config.ts`) + **oxlint** + **Prettier** for linting/formatting
-- **[Vitest](https://vitest.dev/)** for unit tests
+## Run it
 
-No router or state-management library (Vue Router / Pinia) yet — add them when the app actually needs multiple views or cross-component shared state.
-
-> Note on PrimeVue: we're pinned to v4 (`primevue` + `@primevue/themes`), which is MIT-licensed. PrimeVue v5 introduced a new licensing model (community/commercial tiers via `@primeui/license-manager`) — worth reading up on before upgrading past v4.
-
-## Setup
-
-```sh
-npm install
-npm run dev          # start dev server
-npm run build         # type-check + production build
-npm run test:unit      # run Vitest
-npm run lint            # oxlint + eslint --fix
-npm run format            # prettier --write
-```
-
-## Structure
-
-```
-src/
-├── main.ts        # app entry, registers PrimeVue
-├── App.vue
-├── components/
-│   └── __tests__/   # Vitest specs
-└── assets/
-```
+See [backend/README.md](../backend/README.md) — the backend serves these files, there's nothing to run standalone here.

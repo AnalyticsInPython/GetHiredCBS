@@ -18,7 +18,9 @@ venv/
 
 # Database
 *.sql.bak
-mysql-data/
+*.db
+*.sqlite
+*.sqlite3
 
 # Editor / OS
 .vscode/

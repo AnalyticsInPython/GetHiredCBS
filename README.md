@@ -10,12 +10,12 @@ Three layers, one repo:
 
 | Folder | Layer | Stack |
 |---|---|---|
-| [`frontend/`](frontend/) | UI | Vue 3 + TypeScript |
-| [`backend/`](backend/) | Business logic + REST API | Python |
-| [`database/`](database/) | Data storage | MySQL |
+| [`frontend/`](frontend/) | UI | Vue 3 + TypeScript planned; currently a plain HTML/JS/CSS starting point |
+| [`backend/`](backend/) | Business logic + REST API | Python (FastAPI) |
+| [`database/`](database/) | Data storage | SQLite |
 
 ```
-frontend (Vue 3 + TS)  ──►  backend (Python REST API)  ──►  database (MySQL)
+frontend (static HTML/JS/CSS, served by FastAPI)  ──►  backend (FastAPI)  ──►  database (SQLite)
 ```
 
 Each folder has its own README with more detail on what goes there.

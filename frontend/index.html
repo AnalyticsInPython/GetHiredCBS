@@ -1,13 +1,35 @@
-<!DOCTYPE html>
-<html lang="">
-  <head>
-    <meta charset="UTF-8">
-    <link rel="icon" href="/favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vite App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GetHiredCBS</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>GetHiredCBS</h1>
+    <p>CBS alumni job placements</p>
+    <input id="company-filter" type="search" placeholder="Filter by company…" />
+  </header>
+
+  <main>
+    <p id="status">Loading…</p>
+    <table id="alumni-table" hidden>
+      <thead>
+        <tr>
+          <th>Year</th>
+          <th>Name</th>
+          <th>Status</th>
+          <th>Employer</th>
+          <th>Title</th>
+          <th>Industry</th>
+          <th>Location</th>
+        </tr>
+      </thead>
+      <tbody id="alumni-body"></tbody>
+    </table>
+  </main>
+
+  <script src="app.js"></script>
+</body>
 </html>

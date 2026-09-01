@@ -61,5 +61,5 @@ Python ETL pipeline  ──►  Enrichment API calls (Adzuna, EDGAR, Clearbit, W
 
 - **Frontend:** Vue 3 + TypeScript, componentized (search/filter bar, results table, company detail panel).
 - **Backend:** Python (FastAPI), REST endpoints for search, company detail, and alumni detail; a scheduled/one-off ETL script handles ingestion and enrichment.
-- **Database:** SQL (PostgreSQL) with a normalized schema — `alumni`, `companies`, `roles`, `job_postings`, keyed so enrichment data refreshes independently of the core alumni records.
+- **Database:** SQL (SQLite) with a normalized schema — `alumni`, `companies`, `roles`, `job_postings`, keyed so enrichment data refreshes independently of the core alumni records.
 - **Data privacy:** alumni PII (names, exact contact info) is handled per CBS data-use guidelines; the public-facing app aggregates/anonymizes where the underlying data agreement requires it.
