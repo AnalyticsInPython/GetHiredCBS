@@ -8,28 +8,18 @@
 <body>
   <header>
     <h1>GetHiredCBS</h1>
-    <p>CBS alumni job placements</p>
-    <input id="company-filter" type="search" placeholder="Filter by company…" />
+    <p>Where CBS alumni work — bubble size = number of alumni there. Click a company for details.</p>
+    <label for="industry-filter">Industry</label>
+    <select id="industry-filter">
+      <option value="">All industries</option>
+    </select>
   </header>
 
   <main>
     <p id="status">Loading…</p>
-    <table id="alumni-table" hidden>
-      <thead>
-        <tr>
-          <th>Year</th>
-          <th>Name</th>
-          <th>Status</th>
-          <th>Employer</th>
-          <th>Title</th>
-          <th>Industry</th>
-          <th>Location</th>
-        </tr>
-      </thead>
-      <tbody id="alumni-body"></tbody>
-    </table>
+    <div id="bubbles" class="bubble-field" hidden></div>
   </main>
 
-  <script src="app.js"></script>
+  <script src="bubbles.js"></script>
 </body>
 </html>

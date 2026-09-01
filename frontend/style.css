@@ -13,28 +13,86 @@ h1 {
   margin: 0 0 0.25rem;
 }
 
-#company-filter {
-  margin-top: 0.75rem;
-  padding: 0.5rem;
-  width: 100%;
-  max-width: 320px;
-  font-size: 1rem;
+nav {
+  margin: 0.5rem 0;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+nav a {
+  color: #1a56b0;
+  text-decoration: none;
   font-size: 0.9rem;
 }
 
-th, td {
-  text-align: left;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid #ddd;
+nav a:hover {
+  text-decoration: underline;
 }
 
-th {
-  position: sticky;
-  top: 0;
-  background: #fafafa;
+#industry-filter {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+.bubble-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 0 2rem;
+}
+
+.bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  text-align: center;
+  text-decoration: none;
+  color: #0b2545;
+  padding: 0.25rem;
+  line-height: 1.15;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bubble:hover,
+.bubble:focus-visible {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+.bubble-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  max-width: 90%;
+}
+
+.bubble-count {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.fact-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1rem;
+  max-width: 400px;
+}
+
+.fact-list dt {
+  font-weight: 600;
+  color: #555;
+}
+
+.fact-list dd {
+  margin: 0;
+}
+
+.note {
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: 1.5rem;
 }

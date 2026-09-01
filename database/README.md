@@ -16,6 +16,8 @@ database/
 
 Blank cells and the roster's `#N/A` placeholders are both normalized to `NULL` on load.
 
+Per-company stats (alumni count, most recent grad) aren't in the schema — they're computed in `backend/app/main.py` (`compute_company_stats`, behind `GET /api/companies`) off the raw tables above, so that aggregation logic lives in Python rather than as a SQL view.
+
 ## Usage
 
 From the repo root:
