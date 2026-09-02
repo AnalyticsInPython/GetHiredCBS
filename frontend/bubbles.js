@@ -1,6 +1,7 @@
 const statusEl = document.getElementById('status')
 const containerEl = document.getElementById('bubbles')
 const industryFilterEl = document.getElementById('industry-filter')
+const searchEl = document.getElementById('company-search')
 
 let allCompanies = []
 let simulation = null
@@ -234,7 +235,13 @@ const BUBBLE_DISPLAY_LIMIT = 25
 
 function applyFilter() {
   const industry = industryFilterEl.value
-  const matching = industry ? allCompanies.filter((c) => c.industry === industry) : allCompanies
+  const search = searchEl.value.trim().toLowerCase()
+
+  let matching = industry ? allCompanies.filter((c) => c.industry === industry) : allCompanies
+  if (search) {
+    matching = matching.filter((c) => c.company_name.toLowerCase().startsWith(search))
+  }
+
   // Only cap when there'd be too many to show — a filtered-down set under the
   // limit should render in full, not just whatever survived an earlier cut.
   const toRender =
@@ -245,6 +252,7 @@ function applyFilter() {
 }
 
 industryFilterEl.addEventListener('change', applyFilter)
+searchEl.addEventListener('input', applyFilter)
 
 fetch('/api/companies')
   .then((res) => {

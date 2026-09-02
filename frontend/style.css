@@ -50,10 +50,16 @@ nav a:hover {
   text-decoration: underline;
 }
 
-#industry-filter {
+#industry-filter,
+#company-search {
   margin-top: 0.75rem;
   padding: 0.5rem;
   font-size: 1rem;
+}
+
+#company-search {
+  margin-right: 1rem;
+  width: 220px;
 }
 
 .bubble-field {
