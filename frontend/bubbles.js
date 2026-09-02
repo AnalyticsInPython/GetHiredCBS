@@ -3,53 +3,125 @@ const containerEl = document.getElementById('bubbles')
 const industryFilterEl = document.getElementById('industry-filter')
 
 let allCompanies = []
+let simulation = null
 
-const MIN_RADIUS = 30
-const MAX_RADIUS = 90
+const MIN_RADIUS = 10
+const MAX_RADIUS = 110
+const WIDTH = window.innerWidth || 900
 
-function radiusFor(count, maxCount) {
-  const t = maxCount > 0 ? Math.sqrt(count / maxCount) : 0
-  return MIN_RADIUS + (MAX_RADIUS - MIN_RADIUS) * t
+// Fixed, readable categorical palette
+const PALETTE = ['#5B84C4', '#D64545', '#D6A324', '#8A63C9', '#3FA796', '#E07A5F', '#5C946E', '#B56576']
+
+function radiusScale(companies) {
+  const max = d3.max(companies, (d) => d.alumni_count) || 1
+  return d3.scaleSqrt().domain([0, max]).range([MIN_RADIUS, MAX_RADIUS])
 }
 
-function colorFor(count, maxCount) {
-  const t = maxCount > 0 ? count / maxCount : 0
-  const lightness = 80 - t * 40 // more alumni -> deeper color
-  return `hsl(210 65% ${lightness}%)`
-}
-
-function makeBubble(company, maxCount) {
-  const radius = radiusFor(company.alumni_count, maxCount)
-  const diameter = Math.round(radius * 2)
-
-  const bubble = document.createElement('a')
-  bubble.className = 'bubble'
-  bubble.href = `company.html?name=${encodeURIComponent(company.company_name)}`
-  bubble.title = `${company.company_name}: ${company.alumni_count} alumni`
-  bubble.style.width = `${diameter}px`
-  bubble.style.height = `${diameter}px`
-  bubble.style.backgroundColor = colorFor(company.alumni_count, maxCount)
-  bubble.style.fontSize = `${Math.max(11, Math.min(17, diameter / 8))}px`
-
-  const name = document.createElement('span')
-  name.className = 'bubble-name'
-  name.textContent = company.company_name
-
-  const count = document.createElement('span')
-  count.className = 'bubble-count'
-  count.textContent = company.alumni_count
-
-  bubble.append(name, count)
-  return bubble
+function colorScale(companies) {
+  const industries = [...new Set(companies.map((c) => c.industry || 'Other'))].sort()
+  return d3.scaleOrdinal().domain(industries).range(PALETTE)
 }
 
 function render(companies) {
-  const maxCount = companies.reduce((max, c) => Math.max(max, c.alumni_count), 0)
-  const bubbles = companies
+  containerEl.replaceChildren()
+  if (simulation) simulation.stop()
+
+  if (companies.length === 0) {
+    containerEl.hidden = true
+    statusEl.hidden = false
+    statusEl.textContent = 'No companies match this filter.'
+    return
+  }
+  statusEl.hidden = true
+  containerEl.hidden = false
+
+  const rScale = radiusScale(companies)
+  const cScale = colorScale(companies)
+
+  // Pick a height so the bubbles' combined area comfortably fits WIDTH x HEIGHT,
+  // then clamp it to a sane on-screen range instead of a fixed constant.
+  const totalArea = d3.sum(companies, (c) => Math.PI * rScale(c.alumni_count) ** 2)
+  const HEIGHT = Math.max(320, Math.min(640, (totalArea * 1.7) / WIDTH))
+
+  const nodes = companies
     .slice()
     .sort((a, b) => b.alumni_count - a.alumni_count)
-    .map((c) => makeBubble(c, maxCount))
-  containerEl.replaceChildren(...bubbles)
+    .map((c) => ({
+      ...c,
+      r: rScale(c.alumni_count),
+      x: WIDTH / 2 + (Math.random() - 0.5) * 200,
+      y: HEIGHT / 2 + (Math.random() - 0.5) * 200,
+    }))
+
+  const svg = d3
+    .select(containerEl)
+    .append('svg')
+    .attr('viewBox', `0 0 ${WIDTH} ${HEIGHT}`)
+    .attr('width', '100%')
+    .attr('height', HEIGHT)
+    .style('max-height', '75vh')
+
+  const node = svg
+    .selectAll('g.bubble')
+    .data(nodes, (d) => d.company_name)
+    .join('g')
+    .attr('class', 'bubble')
+    .style('cursor', 'pointer')
+    .on('click', (event, d) => {
+      window.location.href = `company.html?name=${encodeURIComponent(d.company_name)}`
+    })
+
+  node
+    .append('circle')
+    .attr('r', (d) => d.r)
+    .attr('fill', (d) => cScale(d.industry || 'Other'))
+    .attr('fill-opacity', 0.88)
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 1.5)
+
+  node.append('title').text((d) => `${d.company_name}: ${d.alumni_count} alumni`)
+
+  node
+    .append('text')
+    .text((d) => (d.r > 22 ? d.company_name : ''))
+    .attr('text-anchor', 'middle')
+    .attr('dy', '-0.2em')
+    .attr('fill', '#fff')
+    .attr('font-size', (d) => Math.max(10, Math.min(15, d.r / 4.2)))
+    .attr('font-weight', 600)
+    .style('pointer-events', 'none')
+
+  node
+    .append('text')
+    .text((d) => (d.r > 22 ? d.alumni_count : ''))
+    .attr('text-anchor', 'middle')
+    .attr('dy', '1.1em')
+    .attr('fill', '#fff')
+    .attr('fill-opacity', 0.85)
+    .attr('font-size', (d) => Math.max(9, Math.min(13, d.r / 5.2)))
+    .style('pointer-events', 'none')
+
+  node
+    .on('mouseenter', function () {
+      d3.select(this).select('circle').attr('fill-opacity', 1).attr('stroke-width', 3)
+    })
+    .on('mouseleave', function () {
+      d3.select(this).select('circle').attr('fill-opacity', 0.88).attr('stroke-width', 1.5)
+    })
+
+  simulation = d3
+    .forceSimulation(nodes)
+    .force('x', d3.forceX(WIDTH / 2).strength(0.12))
+    .force('y', d3.forceY(HEIGHT / 2).strength(0.15))
+    .force('charge', d3.forceManyBody().strength(6))
+    .force('collide', d3.forceCollide((d) => d.r + 1).iterations(3))
+    .on('tick', () => {
+      for (const d of nodes) {
+        d.x = Math.max(d.r, Math.min(WIDTH - d.r, d.x))
+        d.y = Math.max(d.r, Math.min(HEIGHT - d.r, d.y))
+      }
+      node.attr('transform', (d) => `translate(${d.x},${d.y})`)
+    })
 }
 
 function populateIndustryOptions(companies) {
@@ -76,12 +148,15 @@ fetch('/api/companies')
     return res.json()
   })
   .then((companies) => {
-    allCompanies = companies.filter((c) => c.alumni_count > 0)
+    allCompanies = companies
+      .filter((c) => c.alumni_count > 0)
+      .sort((a, b) => b.alumni_count - a.alumni_count)
+      .slice(0, 25)
     populateIndustryOptions(allCompanies)
     render(allCompanies)
-    statusEl.hidden = true
-    containerEl.hidden = false
   })
   .catch((err) => {
+    statusEl.hidden = false
+    containerEl.hidden = true
     statusEl.textContent = `Failed to load company data: ${err.message}`
   })
