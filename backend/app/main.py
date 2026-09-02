@@ -4,6 +4,7 @@ Rudimentary starting point: API endpoints that read the alumni roster out of
 the SQLite database, plus the frontend/ static files mounted at "/".
 """
 
+import json
 import sqlite3
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
@@ -13,9 +14,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
-from app import adzuna
+from app import abstract_company, adzuna
 
-load_dotenv()
+# Local secrets take precedence and are excluded by the repo's *.local rule.
+# Keep the legacy .env fallback for the existing Adzuna configuration.
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(BACKEND_DIR / ".env.local")
+load_dotenv(BACKEND_DIR / ".env")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = REPO_ROOT / "database" / "gethiredcbs.db"
@@ -26,8 +31,31 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 # (25/min, 250/day, 1000/week, 2500/month) even if every one of the ~100
 # companies gets clicked repeatedly.
 JOB_CACHE_TTL = timedelta(days=7)
+ENRICHMENT_CACHE_TTL = timedelta(days=30)
 
 app = FastAPI(title="GetHiredCBS")
+
+
+def ensure_runtime_schema() -> None:
+    """Add cache tables for an existing local database without rebuilding it."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS company_enrichment (
+                company TEXT PRIMARY KEY REFERENCES companies (name),
+                domain TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                fetched_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+ensure_runtime_schema()
 
 
 def query_alumni() -> list[dict]:
@@ -131,6 +159,104 @@ def get_company_alumni(company: str) -> list[dict]:
             (company, STARTUP_STATUS),
         ).fetchall()
         return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def _comparable_roles(conn: sqlite3.Connection, company: str) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT ft_title AS title, COUNT(*) AS alumni_count
+        FROM alumni
+        WHERE ft_employer = ? AND ft_title IS NOT NULL AND status != ?
+        GROUP BY ft_title
+        ORDER BY alumni_count DESC, ft_title
+        LIMIT 8
+        """,
+        (company, STARTUP_STATUS),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+@app.get("/api/companies/{company}/enrichment")
+def get_company_enrichment(company: str) -> dict:
+    """Abstract company data, fetched on demand and cached for 30 days."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        company_row = conn.execute(
+            "SELECT 1 FROM companies WHERE name = ?", (company,)
+        ).fetchone()
+        if not company_row:
+            raise HTTPException(status_code=404, detail="Unknown company")
+
+        roles = _comparable_roles(conn, company)
+        domain = abstract_company.domain_for_company(company)
+        if not domain:
+            return {
+                "company": company,
+                "available": False,
+                "comparable_roles": roles,
+                "warning": "No verified domain is configured for this company.",
+            }
+
+        cached = conn.execute(
+            "SELECT * FROM company_enrichment WHERE company = ?", (company,)
+        ).fetchone()
+        if cached:
+            fetched_at = datetime.fromisoformat(cached["fetched_at"])
+            if datetime.now(timezone.utc) - fetched_at <= ENRICHMENT_CACHE_TTL:
+                return {
+                    "company": company,
+                    "domain": domain,
+                    "available": True,
+                    "source": "cache",
+                    "data": json.loads(cached["payload_json"]),
+                    "comparable_roles": roles,
+                }
+
+        try:
+            payload = abstract_company.fetch_company(domain)
+        except (abstract_company.AbstractConfigError, abstract_company.AbstractAPIError) as exc:
+            if cached:
+                return {
+                    "company": company,
+                    "domain": domain,
+                    "available": True,
+                    "source": "cache-stale",
+                    "warning": str(exc),
+                    "data": json.loads(cached["payload_json"]),
+                    "comparable_roles": roles,
+                }
+            return {
+                "company": company,
+                "domain": domain,
+                "available": False,
+                "warning": str(exc),
+                "comparable_roles": roles,
+            }
+
+        fetched_at = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            """
+            INSERT INTO company_enrichment (company, domain, payload_json, fetched_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(company) DO UPDATE SET
+                domain = excluded.domain,
+                payload_json = excluded.payload_json,
+                fetched_at = excluded.fetched_at
+            """,
+            (company, domain, json.dumps(payload), fetched_at),
+        )
+        conn.commit()
+        return {
+            "company": company,
+            "domain": domain,
+            "available": True,
+            "source": "live",
+            "data": payload,
+            "comparable_roles": roles,
+        }
     finally:
         conn.close()
 
