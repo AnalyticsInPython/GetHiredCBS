@@ -8,6 +8,14 @@ const alumniLayoutEl = document.getElementById('alumni-layout')
 const alumniCardsEl = document.getElementById('alumni-cards')
 const analyticsFunctionEl = document.getElementById('analytics-function')
 const analyticsLocationEl = document.getElementById('analytics-location')
+const functionFilterEl = document.getElementById('function-filter')
+const alumniCountLabelEl = document.getElementById('alumni-count-label')
+const showMoreBtn = document.getElementById('alumni-show-more')
+
+const ALUMNI_PAGE_SIZE = 12
+let allAlumni = []
+let functionFilter = ''
+let visibleCount = ALUMNI_PAGE_SIZE
 
 const factsEl = document.getElementById('company-facts')
 const logoEl = document.getElementById('company-logo')
@@ -78,7 +86,7 @@ function breakdownBy(alumni, key) {
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
 }
 
-function renderBreakdown(listEl, breakdown) {
+function renderBreakdown(listEl, breakdown, { activeLabel, onSelect } = {}) {
   listEl.replaceChildren(
     ...breakdown.map(({ label, count }) => {
       const li = document.createElement('li')
@@ -88,9 +96,58 @@ function renderBreakdown(listEl, breakdown) {
       countEl.className = 'analytics-count'
       countEl.textContent = count
       li.append(labelEl, countEl)
+      if (onSelect) {
+        li.classList.toggle('active', label === activeLabel)
+        li.addEventListener('click', () => onSelect(label))
+      }
       return li
     })
   )
+}
+
+function populateFunctionFilter(breakdown) {
+  const totalCount = breakdown.reduce((sum, { count }) => sum + count, 0)
+  functionFilterEl.replaceChildren(
+    ...[{ label: '', text: `All functions (${totalCount})` }, ...breakdown.map(({ label, count }) => ({
+      label,
+      text: `${label} (${count})`,
+    }))].map(({ label, text }) => {
+      const option = document.createElement('option')
+      option.value = label
+      option.textContent = text
+      return option
+    })
+  )
+  functionFilterEl.value = functionFilter
+}
+
+function setFunctionFilter(label) {
+  functionFilter = functionFilter === label ? '' : label
+  visibleCount = ALUMNI_PAGE_SIZE
+  renderAlumniList()
+}
+
+function renderAlumniList() {
+  const filtered = functionFilter
+    ? allAlumni.filter((alum) => (alum.ft_function || 'Unknown') === functionFilter)
+    : allAlumni
+
+  const visible = filtered.slice(0, visibleCount)
+  alumniCardsEl.replaceChildren(...visible.map(renderAlumnus))
+
+  const remaining = filtered.length - visible.length
+  showMoreBtn.hidden = remaining <= 0
+  showMoreBtn.textContent = `Show ${Math.min(remaining, ALUMNI_PAGE_SIZE)} more`
+
+  alumniCountLabelEl.textContent = functionFilter
+    ? `Showing ${visible.length} of ${filtered.length} in ${functionFilter} (${allAlumni.length} total)`
+    : `Showing ${visible.length} of ${filtered.length}`
+
+  renderBreakdown(analyticsFunctionEl, breakdownBy(allAlumni, 'ft_function'), {
+    activeLabel: functionFilter,
+    onSelect: setFunctionFilter,
+  })
+  functionFilterEl.value = functionFilter
 }
 
 function loadAlumni() {
@@ -108,8 +165,11 @@ function loadAlumni() {
         return
       }
       alumniStatusEl.hidden = true
-      alumniCardsEl.replaceChildren(...alumni.map(renderAlumnus))
-      renderBreakdown(analyticsFunctionEl, breakdownBy(alumni, 'ft_function'))
+      allAlumni = alumni
+      functionFilter = ''
+      visibleCount = ALUMNI_PAGE_SIZE
+      populateFunctionFilter(breakdownBy(alumni, 'ft_function'))
+      renderAlumniList()
       renderBreakdown(analyticsLocationEl, breakdownBy(alumni, 'country'))
       alumniLayoutEl.hidden = false
     })
@@ -117,6 +177,17 @@ function loadAlumni() {
       alumniStatusEl.textContent = `Couldn't load alumni: ${err.message}`
     })
 }
+
+functionFilterEl.addEventListener('change', () => {
+  functionFilter = functionFilterEl.value
+  visibleCount = ALUMNI_PAGE_SIZE
+  renderAlumniList()
+})
+
+showMoreBtn.addEventListener('click', () => {
+  visibleCount += ALUMNI_PAGE_SIZE
+  renderAlumniList()
+})
 
 function formatSalary(job) {
   const fmt = (n) => `$${Math.round(n).toLocaleString()}`

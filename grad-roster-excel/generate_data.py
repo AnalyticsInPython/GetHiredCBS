@@ -5,7 +5,16 @@ from faker import Faker
 
 from create_grad_roster import build_workbook
 
-ROW_COUNT = 500
+ROW_COUNT = 2000
+
+# Within each industry's company list, the first `len(companies) // ANCHOR_FRACTION`
+# companies (already ordered by recognizability, e.g. McKinsey/BCG/Bain first in
+# Consulting) are "anchor" employers that absorb most of that industry's alumni —
+# mimics real alumni-network pipeline effects and gives the company bubble chart a
+# handful of big, meaningful bubbles instead of a flat long tail.
+ANCHOR_FRACTION = 3
+ANCHOR_WEIGHT = 8
+NON_ANCHOR_WEIGHT = 1
 
 GRAD_YEARS = list(range(2019, 2026))
 
@@ -245,10 +254,16 @@ def weighted_choice(pairs):
     return random.choices(items, weights=weights, k=1)[0]
 
 
+def weighted_company_choice(companies: list[str]) -> str:
+    anchor_count = max(1, len(companies) // ANCHOR_FRACTION)
+    weights = [ANCHOR_WEIGHT] * anchor_count + [NON_ANCHOR_WEIGHT] * (len(companies) - anchor_count)
+    return random.choices(companies, weights=weights, k=1)[0]
+
+
 def pick_industry_bundle():
     industry = random.choices(INDUSTRIES, weights=INDUSTRY_W, k=1)[0]
     profile = INDUSTRY_PROFILES[industry]
-    company = random.choice(profile["companies"])
+    company = weighted_company_choice(profile["companies"])
     title = random.choice(profile["titles"])
     function = random.choice(profile["functions"])
     return industry, company, title, function
