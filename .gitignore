@@ -12,9 +12,7 @@ venv/
 *.egg-info/
 
 # Env / secrets
-.env
-.env.*
-!.env.example
+# share secrets cause its a private project and all free anyway
 
 # Database
 *.sql.bak
