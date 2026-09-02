@@ -3,31 +3,54 @@
 <head>
   <meta charset="utf-8" />
   <title>GetHiredCBS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 </head>
 <body>
   <header>
     <h1>GetHiredCBS</h1>
-    <p>Where CBS alumni work — bubble size = number of alumni there. Click a company for details.</p>
-    <label for="company-search">Search</label>
-    <input
-      type="search"
-      id="company-search"
-      placeholder="Search companies…"
-      autocomplete="off"
-    />
-
-    <label for="industry-filter">Industry</label>
-    <select id="industry-filter">
-      <option value="">All industries</option>
-    </select>
+    <p class="sub">
+      A look at where Columbia Business School alumni are working right now. Bubble size shows how
+      many alumni are there. Click a company for details.
+    </p>
+    <div id="stat"></div>
   </header>
 
-  <main>
-    <p id="status">Loading…</p>
-    <div id="bubbles" class="bubble-field" hidden></div>
-  </main>
+  <div class="controls">
+    <div class="search-box">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#736C5C" stroke-width="2">
+        <circle cx="11" cy="11" r="7" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+      <input type="search" id="company-search" placeholder="Search companies" autocomplete="off" />
+    </div>
+    <div class="chips" id="industry-chips"></div>
+  </div>
+
+  <div class="canvas-outer">
+    <div class="canvas-wrap">
+      <p id="status">Loading…</p>
+      <div id="bubbles" class="bubble-field" hidden></div>
+      <div class="empty-state" id="empty-state">
+        <b>No companies match</b>
+        <span>Try a different name or industry.</span>
+      </div>
+    </div>
+  </div>
+  <p class="legend-caption">Bubble color shows industry. Click a chip above to filter by one.</p>
+
+  <div class="panel" id="panel">
+    <button class="close" id="panel-close" aria-label="Close">&times;</button>
+    <div class="tag" id="panel-tag"></div>
+    <h3 id="panel-name"></h3>
+    <div class="count-line" id="panel-meta"></div>
+    <a class="cta" id="panel-cta" href="#">See who's there</a>
+  </div>
 
   <script src="bubbles.js"></script>
 </body>
