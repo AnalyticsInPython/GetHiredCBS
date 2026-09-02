@@ -9,6 +9,29 @@ header {
   margin-bottom: 1.5rem;
 }
 
+.company-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.company-logo {
+  width: auto;
+  min-width: 72px;
+  max-width: 240px;
+  height: 72px;
+  border: 1px solid #e2e2e2;
+  border-radius: 12px;
+  object-fit: contain;
+  padding: 0.4rem;
+  background: #fff;
+}
+
+.company-domain {
+  color: #555;
+  font-size: 0.9rem;
+}
+
 h1 {
   margin: 0 0 0.25rem;
 }
@@ -79,7 +102,52 @@ nav a:hover {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 0.4rem 1rem;
-  max-width: 400px;
+  max-width: 680px;
+}
+
+.company-description {
+  max-width: 720px;
+  line-height: 1.55;
+}
+
+#roles-section,
+#other-data-section {
+  margin-top: 1.75rem;
+  max-width: 720px;
+}
+
+#roles-section h2,
+#other-data-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.role-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+}
+
+.role-list li,
+.tag {
+  border-radius: 999px;
+  background: #eef4fc;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+.tag-list,
+.company-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.company-links a {
+  color: #1a56b0;
 }
 
 .fact-list dt {

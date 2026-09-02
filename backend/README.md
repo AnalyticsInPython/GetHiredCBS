@@ -27,6 +27,21 @@ uv run uvicorn app.main:app --reload
 
 Then open http://127.0.0.1:8000 — that serves `frontend/index.html`, which calls `GET /api/alumni` for data. Requires `database/gethiredcbs.db` to exist first (see [database/README.md](../database/README.md)).
 
+## Abstract company enrichment
+
+Company detail pages fetch company information from Abstract API on demand and
+cache it in SQLite for 30 days. Create a Company Enrichment API key, then make a
+local secrets file (the `*.local` pattern is gitignored):
+
+```sh
+cp .env.local.example .env.local
+# Edit .env.local and set ABSTRACT_API_KEY.
+```
+
+Abstract requires a verified domain rather than a company name. Known roster
+companies are mapped in `app/abstract_company.py`; synthetic startup/venture
+names show roster-derived comparable roles but skip the external API call.
+
 ## `/api/companies/{company}/jobs` — Adzuna job ads, on demand
 
 Fetches live job postings for a company from the [Adzuna Jobs API](https://developer.adzuna.com/) (free tier) and caches them in the `job_postings` table.
