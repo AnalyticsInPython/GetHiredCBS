@@ -75,6 +75,10 @@ nav a:hover {
   pointer-events: none;
 }
 
+.bubble circle {
+  transition: r 0.15s ease, fill-opacity 0.15s ease, stroke-width 0.15s ease;
+}
+
 .fact-list {
   display: grid;
   grid-template-columns: max-content 1fr;

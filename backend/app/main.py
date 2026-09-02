@@ -100,11 +100,10 @@ def compute_company_stats() -> list[dict]:
         companies = [row["name"] for row in conn.execute("SELECT name FROM companies")]
         employed = conn.execute(
             """
-            SELECT ft_employer, ft_industry
+            SELECT ft_employer, ft_industry, status
             FROM alumni
-            WHERE ft_employer IS NOT NULL AND status != ?
-            """,
-            (STARTUP_STATUS,),
+            WHERE ft_employer IS NOT NULL
+            """
         ).fetchall()
     finally:
         conn.close()
@@ -115,11 +114,22 @@ def compute_company_stats() -> list[dict]:
 
     stats = []
     for name in companies:
-        employees = by_company.get(name, [])
-        # A company's alumni should all share one ft_industry in this dataset,
-        # but take the most common value defensively in case that ever drifts.
-        industries = Counter(r["ft_industry"] for r in employees if r["ft_industry"])
-        industry = industries.most_common(1)[0][0] if industries else None
+        rows = by_company.get(name, [])
+        # A startup founder isn't counted as "working at" their own company
+        # (see STARTUP_STATUS above) — but the company itself still gets
+        # tagged "Startup" rather than being left with no industry at all.
+        is_startup = any(r["status"] == STARTUP_STATUS for r in rows)
+        employees = [r for r in rows if r["status"] != STARTUP_STATUS]
+
+        if is_startup:
+            industry = "Startup"
+        else:
+            # A company's alumni should all share one ft_industry in this
+            # dataset, but take the most common value defensively in case
+            # that ever drifts.
+            industries = Counter(r["ft_industry"] for r in employees if r["ft_industry"])
+            industry = industries.most_common(1)[0][0] if industries else None
+
         stats.append(
             {
                 "company_name": name,
