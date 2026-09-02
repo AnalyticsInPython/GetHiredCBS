@@ -2,9 +2,14 @@ const companyName = new URLSearchParams(window.location.search).get('name')
 
 const nameEl = document.getElementById('company-name')
 const statusEl = document.getElementById('status')
+
+const alumniStatusEl = document.getElementById('alumni-status')
+const alumniLayoutEl = document.getElementById('alumni-layout')
+const alumniCardsEl = document.getElementById('alumni-cards')
+const analyticsFunctionEl = document.getElementById('analytics-function')
+const analyticsLocationEl = document.getElementById('analytics-location')
+
 const factsEl = document.getElementById('company-facts')
-const countEl = document.getElementById('alumni-count')
-const recentEl = document.getElementById('most-recent')
 const logoEl = document.getElementById('company-logo')
 const domainEl = document.getElementById('company-domain')
 const industryEl = document.getElementById('industry')
@@ -25,10 +30,92 @@ const jobsStatusEl = document.getElementById('jobs-status')
 const jobsWarningEl = document.getElementById('jobs-warning')
 const jobsListEl = document.getElementById('jobs-list')
 
-function formatMostRecent(company) {
-  if (!company.most_recent_alumnus_first_name) return 'N/A'
-  const grad = String(company.most_recent_alumnus_grad_year).slice(-2)
-  return `${company.most_recent_alumnus_first_name} ${company.most_recent_alumnus_last_name} ('${grad})`
+function renderAlumnus(alum) {
+  const card = document.createElement('div')
+  card.className = 'alumni-card'
+
+  const name = document.createElement('div')
+  name.className = 'alumni-name'
+  name.textContent = `${alum.first_name} ${alum.last_name}`
+  card.append(name)
+
+  const grad = document.createElement('div')
+  grad.className = 'alumni-meta'
+  grad.textContent = `Class of ${alum.graduating_year}`
+  card.append(grad)
+
+  if (alum.ft_title) {
+    const title = document.createElement('div')
+    title.className = 'alumni-meta'
+    title.textContent = `Title: ${alum.ft_title}`
+    card.append(title)
+  }
+
+  if (alum.ft_function) {
+    const fn = document.createElement('div')
+    fn.className = 'alumni-meta'
+    fn.textContent = `Function: ${alum.ft_function}`
+    card.append(fn)
+  }
+
+  const email = document.createElement('a')
+  email.className = 'alumni-email'
+  email.href = `mailto:${alum.email}`
+  email.textContent = alum.email
+  card.append(email)
+
+  return card
+}
+
+function breakdownBy(alumni, key) {
+  const counts = new Map()
+  for (const alum of alumni) {
+    const label = alum[key] || 'Unknown'
+    counts.set(label, (counts.get(label) || 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+}
+
+function renderBreakdown(listEl, breakdown) {
+  listEl.replaceChildren(
+    ...breakdown.map(({ label, count }) => {
+      const li = document.createElement('li')
+      const labelEl = document.createElement('span')
+      labelEl.textContent = label
+      const countEl = document.createElement('span')
+      countEl.className = 'analytics-count'
+      countEl.textContent = count
+      li.append(labelEl, countEl)
+      return li
+    })
+  )
+}
+
+function loadAlumni() {
+  fetch(`/api/companies/${encodeURIComponent(companyName)}/alumni`)
+    .then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.detail || `API error: ${res.status}`)
+      }
+      return res.json()
+    })
+    .then((alumni) => {
+      if (!alumni.length) {
+        alumniStatusEl.textContent = 'No alumni currently listed at this company.'
+        return
+      }
+      alumniStatusEl.hidden = true
+      alumniCardsEl.replaceChildren(...alumni.map(renderAlumnus))
+      renderBreakdown(analyticsFunctionEl, breakdownBy(alumni, 'ft_function'))
+      renderBreakdown(analyticsLocationEl, breakdownBy(alumni, 'country'))
+      alumniLayoutEl.hidden = false
+    })
+    .catch((err) => {
+      alumniStatusEl.textContent = `Couldn't load alumni: ${err.message}`
+    })
 }
 
 function formatSalary(job) {
@@ -149,6 +236,7 @@ function renderEnrichment(result) {
 
   const data = result.data
   enrichmentStatusEl.hidden = true
+  factsEl.hidden = false
   setOptionalFact(industryEl, data.industry)
   setOptionalFact(sizeEl, data.employee_range || data.employee_count)
   setOptionalFact(
@@ -228,36 +316,23 @@ function loadJobs() {
       jobsListEl.hidden = false
     })
     .catch((err) => {
-      jobsStatusEl.textContent = `Couldn't load job postings: ${err.message}`
+      // Adzuna occasionally 400s on certain company names, and it's just
+      // as often unreachable/misconfigured/rate-limited — none of that is
+      // useful to show a visitor, so keep the message generic either way.
+      console.error(`Failed to load job postings for ${companyName}:`, err)
+      jobsStatusEl.textContent = 'No open listings found for this company right now.'
     })
 }
 
 if (!companyName) {
   nameEl.textContent = 'Company not found'
   statusEl.textContent = 'No company was specified.'
+  alumniStatusEl.hidden = true
+  enrichmentStatusEl.hidden = true
   jobsStatusEl.hidden = true
 } else {
   nameEl.textContent = companyName
-
-  fetch('/api/companies')
-    .then((res) => {
-      if (!res.ok) throw new Error(`API error: ${res.status}`)
-      return res.json()
-    })
-    .then((companies) => {
-      const company = companies.find((c) => c.company_name === companyName)
-      if (!company) {
-        statusEl.textContent = 'No data found for this company.'
-        return
-      }
-      countEl.textContent = company.alumni_count
-      recentEl.textContent = formatMostRecent(company)
-      factsEl.hidden = false
-    })
-    .catch((err) => {
-      statusEl.textContent = `Failed to load company data: ${err.message}`
-    })
-
+  loadAlumni()
   loadJobs()
   loadEnrichment()
 }

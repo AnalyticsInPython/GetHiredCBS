@@ -81,8 +81,14 @@ def get_alumni() -> list[dict]:
     return query_alumni()
 
 
+# Alumni with this status are founding their own company rather than
+# joining an employer, so they're excluded from all company-based
+# visualizations (bubbles, per-company alumni lists) as not relevant there.
+STARTUP_STATUS = "Starting a new business"
+
+
 def compute_company_stats() -> list[dict]:
-    """Per-company alumni_count and the most recent grad who works there.
+    """Per-company alumni_count, for sizing bubbles on the main page.
 
     Computed here in Python (not a SQL view) off alumni.ft_employer —
     "works at" is read as current full-time employer, not the summer
@@ -94,10 +100,11 @@ def compute_company_stats() -> list[dict]:
         companies = [row["name"] for row in conn.execute("SELECT name FROM companies")]
         employed = conn.execute(
             """
-            SELECT email, first_name, last_name, graduating_year, ft_employer, ft_industry
+            SELECT ft_employer, ft_industry
             FROM alumni
-            WHERE ft_employer IS NOT NULL
-            """
+            WHERE ft_employer IS NOT NULL AND status != ?
+            """,
+            (STARTUP_STATUS,),
         ).fetchall()
     finally:
         conn.close()
@@ -109,12 +116,6 @@ def compute_company_stats() -> list[dict]:
     stats = []
     for name in companies:
         employees = by_company.get(name, [])
-        # Highest graduating_year first; alphabetical by name breaks ties.
-        most_recent = min(
-            employees,
-            key=lambda r: (-r["graduating_year"], r["last_name"], r["first_name"]),
-            default=None,
-        )
         # A company's alumni should all share one ft_industry in this dataset,
         # but take the most common value defensively in case that ever drifts.
         industries = Counter(r["ft_industry"] for r in employees if r["ft_industry"])
@@ -124,10 +125,6 @@ def compute_company_stats() -> list[dict]:
                 "company_name": name,
                 "alumni_count": len(employees),
                 "industry": industry,
-                "most_recent_alumnus_email": most_recent["email"] if most_recent else None,
-                "most_recent_alumnus_first_name": most_recent["first_name"] if most_recent else None,
-                "most_recent_alumnus_last_name": most_recent["last_name"] if most_recent else None,
-                "most_recent_alumnus_grad_year": most_recent["graduating_year"] if most_recent else None,
             }
         )
     stats.sort(key=lambda s: s["company_name"])
@@ -139,17 +136,44 @@ def get_companies() -> list[dict]:
     return compute_company_stats()
 
 
+@app.get("/api/companies/{company}/alumni")
+def get_company_alumni(company: str) -> list[dict]:
+    """One card's worth of data per alum currently working at `company`,
+    plus country (unused on the card itself, used for the by-location
+    analytics breakdown computed client-side from this same list)."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        if not conn.execute(
+            "SELECT 1 FROM companies WHERE name = ?", (company,)
+        ).fetchone():
+            raise HTTPException(status_code=404, detail="Unknown company")
+
+        rows = conn.execute(
+            """
+            SELECT first_name, last_name, graduating_year, email, ft_title, ft_function, country
+            FROM alumni
+            WHERE ft_employer = ? AND status != ?
+            ORDER BY graduating_year DESC, last_name, first_name
+            """,
+            (company, STARTUP_STATUS),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
 def _comparable_roles(conn: sqlite3.Connection, company: str) -> list[dict]:
     rows = conn.execute(
         """
         SELECT ft_title AS title, COUNT(*) AS alumni_count
         FROM alumni
-        WHERE ft_employer = ? AND ft_title IS NOT NULL
+        WHERE ft_employer = ? AND ft_title IS NOT NULL AND status != ?
         GROUP BY ft_title
         ORDER BY alumni_count DESC, ft_title
         LIMIT 8
         """,
-        (company,),
+        (company, STARTUP_STATUS),
     ).fetchall()
     return [dict(row) for row in rows]
 
