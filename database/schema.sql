@@ -53,3 +53,12 @@ CREATE TABLE IF NOT EXISTS job_postings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_job_postings_company ON job_postings (company);
+
+-- Cached Abstract Company Enrichment API response. One on-demand lookup per
+-- company is reused until it becomes stale, preserving the free-tier quota.
+CREATE TABLE IF NOT EXISTS company_enrichment (
+    company         TEXT PRIMARY KEY REFERENCES companies (name),
+    domain          TEXT NOT NULL,
+    payload_json    TEXT NOT NULL,
+    fetched_at      TEXT NOT NULL
+);

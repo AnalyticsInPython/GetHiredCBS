@@ -8,7 +8,13 @@
 <body>
   <header>
     <nav><a href="index.html">← Back to companies</a></nav>
-    <h1 id="company-name">Loading…</h1>
+    <div class="company-heading">
+      <img id="company-logo" class="company-logo" alt="" hidden />
+      <div>
+        <h1 id="company-name">Loading…</h1>
+        <a id="company-domain" class="company-domain" target="_blank" rel="noopener" hidden></a>
+      </div>
+    </div>
   </header>
 
   <main>
@@ -18,11 +24,32 @@
       <dd id="alumni-count"></dd>
       <dt>Most recent grad</dt>
       <dd id="most-recent"></dd>
+      <dt hidden>Industry</dt>
+      <dd id="industry" hidden></dd>
+      <dt hidden>Size</dt>
+      <dd id="company-size" hidden></dd>
+      <dt hidden>Headquarters</dt>
+      <dd id="headquarters" hidden></dd>
+      <dt hidden>Founded</dt>
+      <dd id="year-founded" hidden></dd>
+      <dt hidden>Revenue</dt>
+      <dd id="revenue" hidden></dd>
+      <dt hidden>Company type</dt>
+      <dd id="company-type" hidden></dd>
     </dl>
-    <p class="note">
-      This is a placeholder — industry, size, comparable roles, and other
-      enrichment data will land here later.
-    </p>
+    <p id="company-description" class="company-description" hidden></p>
+    <p id="enrichment-status" class="note">Loading company enrichment…</p>
+
+    <section id="roles-section" hidden>
+      <h2>Comparable roles</h2>
+      <ul id="roles-list" class="role-list"></ul>
+    </section>
+
+    <section id="other-data-section" hidden>
+      <h2>Other enrichment data</h2>
+      <div id="tags" class="tag-list"></div>
+      <div id="company-links" class="company-links"></div>
+    </section>
 
     <section id="jobs-section">
       <h2>Open roles</h2>
