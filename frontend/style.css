@@ -75,26 +75,14 @@ nav a:hover {
   opacity: 0.8;
 }
 
-.fact-list {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.4rem 1rem;
-  max-width: 400px;
-}
-
-.fact-list dt {
-  font-weight: 600;
-  color: #555;
-}
-
-.fact-list dd {
-  margin: 0;
-}
-
 .note {
   color: #666;
   font-size: 0.9rem;
   margin-top: 1.5rem;
+}
+
+#alumni-section {
+  margin-top: 2rem;
 }
 
 #jobs-section {
@@ -102,9 +90,102 @@ nav a:hover {
   max-width: 640px;
 }
 
+#alumni-section h2,
 #jobs-section h2 {
   font-size: 1.1rem;
   margin-bottom: 0.5rem;
+}
+
+#alumni-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.alumni-grid {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.6rem;
+}
+
+.analytics-panel {
+  flex: 0 0 220px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  background: #fafafa;
+}
+
+.analytics-panel h3 {
+  font-size: 0.85rem;
+  margin: 0.75rem 0 0.35rem;
+}
+
+.analytics-panel h3:first-child {
+  margin-top: 0;
+}
+
+.analytics-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.analytics-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+
+.analytics-list .analytics-count {
+  color: #555;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  #alumni-layout {
+    flex-direction: column;
+  }
+
+  .analytics-panel {
+    flex-basis: auto;
+    width: 100%;
+  }
+}
+
+.alumni-card {
+  border: 1px solid #ddd;
+  border-left: 4px solid #1a56b0;
+  border-radius: 8px;
+  background: #f4f8ff;
+  padding: 0.75rem 1rem;
+  overflow-wrap: anywhere;
+}
+
+.alumni-name {
+  font-weight: 600;
+}
+
+.alumni-meta {
+  color: #555;
+  font-size: 0.85rem;
+  margin-top: 0.15rem;
+}
+
+.alumni-email {
+  display: block;
+  margin-top: 0.4rem;
+  color: #1a56b0;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.alumni-email:hover {
+  text-decoration: underline;
 }
 
 .job-list {
@@ -118,7 +199,9 @@ nav a:hover {
 
 .job-card {
   border: 1px solid #ddd;
+  border-left: 4px solid #c07a1e;
   border-radius: 8px;
+  background: #fdf9f2;
   padding: 0.75rem 1rem;
 }
 

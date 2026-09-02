@@ -13,16 +13,24 @@
 
   <main>
     <p id="status"></p>
-    <dl id="company-facts" class="fact-list" hidden>
-      <dt>Alumni working here</dt>
-      <dd id="alumni-count"></dd>
-      <dt>Most recent grad</dt>
-      <dd id="most-recent"></dd>
-    </dl>
     <p class="note">
       This is a placeholder — industry, size, comparable roles, and other
       enrichment data will land here later.
     </p>
+
+    <section id="alumni-section">
+      <h2>Alumni working here</h2>
+      <p id="alumni-status">Loading…</p>
+      <div id="alumni-layout" hidden>
+        <div id="alumni-cards" class="alumni-grid"></div>
+        <aside id="alumni-analytics" class="analytics-panel">
+          <h3>By function</h3>
+          <ul id="analytics-function" class="analytics-list"></ul>
+          <h3>By location</h3>
+          <ul id="analytics-location" class="analytics-list"></ul>
+        </aside>
+      </div>
+    </section>
 
     <section id="jobs-section">
       <h2>Open roles</h2>
