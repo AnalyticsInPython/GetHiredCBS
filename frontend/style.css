@@ -201,7 +201,7 @@ nav a:hover {
 }
 
 .canvas-wrap {
-  max-width: 1200px;
+  max-width: 704px;
   margin: 0.75rem auto;
   position: relative;
   background: var(--panel);
@@ -231,8 +231,31 @@ nav a:hover {
   opacity: 0.12;
 }
 
+/* Scoped to the circle (not the bubble group) — the group's own transform
+   attribute already carries the bubble's JS-computed translate position,
+   and a CSS transform on the group would replace that instead of
+   compounding with it. Animating the circle's transform in isolation
+   avoids fighting that translate. */
+.bubble.pop circle {
+  animation: bubble-pop 0.32s cubic-bezier(0.2, 0.8, 0.3, 1.4);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes bubble-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .legend-caption {
-  max-width: 1200px;
+  max-width: 704px;
   margin: 0 auto;
   padding: 0.3rem 0 1.5rem;
   font-size: 0.8rem;

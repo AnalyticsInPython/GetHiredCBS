@@ -17,15 +17,15 @@ let node = null
 let simulation = null
 let activeIndustry = 'all'
 
-const MIN_RADIUS = 4
-const MAX_RADIUS = 34
+const MIN_RADIUS = 3.3
+const MAX_RADIUS = 26.4
 const BUBBLE_DISPLAY_LIMIT = 25
 
 // One fixed font size for every bubble — names that don't fit wrap onto
 // additional lines instead of shrinking, so text weight/size stays
 // consistent across the whole chart.
-const NAME_FONT_SIZE = 5
-const COUNT_FONT_SIZE = 4
+const NAME_FONT_SIZE = 4
+const COUNT_FONT_SIZE = 3.3
 const LINE_HEIGHT = NAME_FONT_SIZE * 1.2
 const MAX_NAME_LINES = 3
 
@@ -35,7 +35,11 @@ const NAME_WIDTH_FRACTION = 0.82
 
 // Bubbles smaller than this (radius, in the same user units as MIN/MAX
 // RADIUS) don't get any text at all — there's no room to wrap into.
-const MIN_RADIUS_FOR_TEXT = 9
+const MIN_RADIUS_FOR_TEXT = 7.2
+
+// How many steps to advance the force simulation before anything is drawn,
+// so bubbles appear already settled instead of visibly jiggling into place.
+const SETTLE_ITERATIONS = 300
 
 // Fixed, readable categorical palette — used so color carries information
 // (which industry a bubble belongs to), cycling if there are more
@@ -88,31 +92,50 @@ function render(companies) {
 
   // The single largest bubble is fixed dead center (d3's fx/fy exempt a node
   // from every force below); every other bubble stays fully mobile, so the
-  // rest settle and jiggle around it under collision/repulsion rather than
-  // snapping to fixed slots.
+  // rest settle around it under collision/repulsion rather than snapping to
+  // fixed slots.
   const anchor = nodes[0]
   anchor.fx = 0
   anchor.fy = 0
 
-  // Size the view so its own area is a fixed multiple of total bubble area
-  // (packing-density target ~1/PACKING_LOOSENESS).
-  const PACKING_LOOSENESS = 1.08
-  const totalArea = d3.sum(nodes, (d) => Math.PI * d.r ** 2)
-  const half = Math.max(45, Math.min(200, 0.5 * Math.sqrt(PACKING_LOOSENESS * totalArea)))
-  const viewSize = half * 2
+  // Run the force simulation fully to convergence *before* anything is
+  // appended to the DOM, so bubbles appear already in their settled
+  // positions instead of visibly jiggling into place.
+  simulation = d3
+    .forceSimulation(nodes)
+    .force('x', d3.forceX(0).strength(0.18))
+    .force('y', d3.forceY(0).strength(0.22))
+    .force('charge', d3.forceManyBody().strength(18))
+    .force('collide', d3.forceCollide((d) => d.r + 0.5).iterations(6))
+    .stop()
+  for (let i = 0; i < SETTLE_ITERATIONS; i++) simulation.tick()
+
+  // Fit the view to the bubbles' actual (non-square) bounding box, and
+  // derive the SVG's pixel height from that box's aspect ratio against the
+  // container's real width — so the displayed aspect always matches the
+  // viewBox and the browser never has to letterbox with blank space.
+  const PAD = 4
+  const minX = d3.min(nodes, (d) => d.x - d.r) - PAD
+  const maxX = d3.max(nodes, (d) => d.x + d.r) + PAD
+  const minY = d3.min(nodes, (d) => d.y - d.r) - PAD
+  const maxY = d3.max(nodes, (d) => d.y + d.r) + PAD
+  const boxWidth = maxX - minX
+  const boxHeight = maxY - minY
+  const containerWidth = containerEl.clientWidth || boxWidth
 
   const svg = d3
     .select(containerEl)
     .append('svg')
-    .attr('viewBox', `${-half} ${-half} ${viewSize} ${viewSize}`)
+    .attr('viewBox', `${minX} ${minY} ${boxWidth} ${boxHeight}`)
     .attr('width', '100%')
-    .attr('height', viewSize)
+    .attr('height', containerWidth * (boxHeight / boxWidth))
 
   node = svg
     .selectAll('g.bubble')
     .data(nodes, (d) => d.company_name)
     .join('g')
     .attr('class', 'bubble')
+    .attr('transform', (d) => `translate(${d.x},${d.y})`)
     .style('cursor', 'pointer')
     .on('click', (event, d) => openPanel(d, colorScale))
 
@@ -232,40 +255,7 @@ function render(companies) {
         .attr('stroke-width', 1.5)
     })
 
-  simulation = d3
-    .forceSimulation(nodes)
-    .force('x', d3.forceX(0).strength(0.18))
-    .force('y', d3.forceY(0).strength(0.22))
-    .force('charge', d3.forceManyBody().strength(18))
-    .force('collide', d3.forceCollide((d) => d.r + 0.5).iterations(6))
-    .on('tick', () => {
-      // No hard position clamp here on purpose: forcing nodes back inside a
-      // fixed boundary mid-simulation fights the collision force exactly
-      // where the fixed center anchor already crowds everything else, which
-      // was producing real, persistent overlaps. Instead the viewBox itself
-      // is refit to the current positions every tick, below.
-      //
-      // The viewBox is fit to the bubbles' actual (non-square) bounding
-      // box, and the SVG's pixel height is derived from that box's aspect
-      // ratio against the container's real width — so the box's aspect
-      // ratio always matches what's displayed and the browser never has to
-      // letterbox (pad with blank space) to preserve a mismatched aspect.
-      const PAD = 8
-      const minX = d3.min(nodes, (d) => d.x - d.r) - PAD
-      const maxX = d3.max(nodes, (d) => d.x + d.r) + PAD
-      const minY = d3.min(nodes, (d) => d.y - d.r) - PAD
-      const maxY = d3.max(nodes, (d) => d.y + d.r) + PAD
-      const boxWidth = maxX - minX
-      const boxHeight = maxY - minY
-      const containerWidth = containerEl.clientWidth || boxWidth
-
-      svg
-        .attr('viewBox', `${minX} ${minY} ${boxWidth} ${boxHeight}`)
-        .attr('height', containerWidth * (boxHeight / boxWidth))
-      node.attr('transform', (d) => `translate(${d.x},${d.y})`)
-    })
-
-  applyDimming()
+  applyDimming(false)
 }
 
 function openPanel(d, colorScale) {
@@ -314,7 +304,7 @@ function renderChips(companies) {
 // Filters by dimming bubbles in place, rather than re-running the
 // simulation, so the layout stays stable while the user types or clicks a
 // chip — matching/non-matching bubbles are just toggled visually.
-function applyDimming() {
+function applyDimming(animate = true) {
   if (!node) return
   const search = searchEl.value.trim().toLowerCase()
   let anyVisible = false
@@ -326,6 +316,19 @@ function applyDimming() {
     if (match) anyVisible = true
     return !match
   })
+
+  // Give matching bubbles a quick "pop" so the result of a new filter
+  // reads as an event, not just a fade — skipped on the initial render,
+  // which is already drawn in its settled state.
+  if (animate) {
+    node.classed('pop', false)
+    void containerEl.offsetWidth // force reflow so the animation restarts from scratch
+    node
+      .filter(function () {
+        return !d3.select(this).classed('dim')
+      })
+      .classed('pop', true)
+  }
 
   emptyStateEl.classList.toggle('show', !anyVisible)
 }
