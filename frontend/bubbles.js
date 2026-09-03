@@ -1,38 +1,50 @@
 const statusEl = document.getElementById('status')
 const containerEl = document.getElementById('bubbles')
-const industryFilterEl = document.getElementById('industry-filter')
+const emptyStateEl = document.getElementById('empty-state')
 const searchEl = document.getElementById('company-search')
+const chipsEl = document.getElementById('industry-chips')
+const statEl = document.getElementById('stat')
+const panelEl = document.getElementById('panel')
+const panelTagEl = document.getElementById('panel-tag')
+const panelNameEl = document.getElementById('panel-name')
+const panelMetaEl = document.getElementById('panel-meta')
+const panelCtaEl = document.getElementById('panel-cta')
+const panelCloseEl = document.getElementById('panel-close')
 
 let allCompanies = []
+let renderedNodes = []
+let node = null
 let simulation = null
+let activeIndustry = 'all'
 
-const MIN_RADIUS = 16
-const MAX_RADIUS = 150
+const MIN_RADIUS = 4
+const MAX_RADIUS = 34
+const BUBBLE_DISPLAY_LIMIT = 25
 
-// Base font sizes, before the shrink-to-fit safety net below runs. Uses the
-// same sqrt(alumni_count) curve as radiusScale, over the same domain, so
-// font size tracks bubble size directly rather than saturating against a
-// fixed r/divisor ceiling that only suits one particular radius range.
-const NAME_FONT_RANGE = [9, 30]
-const COUNT_FONT_RANGE = [8, 20]
+// One fixed font size for every bubble — names that don't fit wrap onto
+// additional lines instead of shrinking, so text weight/size stays
+// consistent across the whole chart.
+const NAME_FONT_SIZE = 5
+const COUNT_FONT_SIZE = 4
+const LINE_HEIGHT = NAME_FONT_SIZE * 1.2
+const MAX_NAME_LINES = 3
 
-// How much of a bubble's diameter its name text is allowed to use before
-// getting shrunk to fit.
+// How much of a bubble's diameter a line of text is allowed to use before
+// wrapping to the next line.
 const NAME_WIDTH_FRACTION = 0.82
-const MIN_NAME_FONT_SIZE = 6
 
-// Fixed, readable categorical palette — used when bubbles span multiple
-// industries, so color still carries information (which industry).
-const PALETTE = ['#5B84C4', '#D64545', '#D6A324', '#8A63C9', '#3FA796', '#E07A5F', '#5C946E', '#B56576']
+// Bubbles smaller than this (radius, in the same user units as MIN/MAX
+// RADIUS) don't get any text at all — there's no room to wrap into.
+const MIN_RADIUS_FOR_TEXT = 9
+
+// Fixed, readable categorical palette — used so color carries information
+// (which industry a bubble belongs to), cycling if there are more
+// industries in the data than swatches.
+const PALETTE = ['#375D8C', '#1F8A78', '#A6414F', '#C89B3C', '#6A4E8C', '#B5502E', '#708238', '#A9762C']
 
 function radiusScale(companies) {
   const max = d3.max(companies, (d) => d.alumni_count) || 1
   return d3.scaleSqrt().domain([0, max]).range([MIN_RADIUS, MAX_RADIUS])
-}
-
-function fontScale(companies, range) {
-  const max = d3.max(companies, (d) => d.alumni_count) || 1
-  return d3.scaleSqrt().domain([0, max]).range(range)
 }
 
 function industryColorScale(companies) {
@@ -40,42 +52,25 @@ function industryColorScale(companies) {
   return d3.scaleOrdinal().domain(industries).range(PALETTE)
 }
 
-// Shades of blue only, darker = more alumni. Anchored a bit above pure white
-// at the low end (0.32 instead of 0) so even the smallest bubble keeps
-// enough contrast for white text. Only used once an industry filter is
-// applied — at that point every bubble shares one industry, so color would
-// otherwise carry no information; size-by-shade fills that gap instead.
-function sizeColorScale(companies) {
-  const [min, max] = d3.extent(companies, (d) => d.alumni_count)
-  return d3
-    .scaleSequential((t) => d3.interpolateBlues(0.32 + 0.65 * t))
-    .domain([min ?? 0, max ?? 1])
-}
-
-function render(companies, { filtered = false } = {}) {
+function render(companies) {
   containerEl.replaceChildren()
   if (simulation) simulation.stop()
+  panelEl.classList.remove('show')
 
   if (companies.length === 0) {
     containerEl.hidden = true
     statusEl.hidden = false
-    statusEl.textContent = 'No companies match this filter.'
+    statusEl.textContent = 'No companies to show.'
+    node = null
+    renderedNodes = []
     return
   }
   statusEl.hidden = true
   containerEl.hidden = false
 
   const rScale = radiusScale(companies)
-  const nameFontScale = fontScale(companies, NAME_FONT_RANGE)
-  const countFontScale = fontScale(companies, COUNT_FONT_RANGE)
-  let colorFor
-  if (filtered) {
-    const scale = sizeColorScale(companies)
-    colorFor = (d) => scale(d.alumni_count)
-  } else {
-    const scale = industryColorScale(companies)
-    colorFor = (d) => scale(d.industry || 'Other')
-  }
+  const colorScale = industryColorScale(companies)
+  const colorFor = (d) => colorScale(d.industry || 'Other')
 
   // Coordinates are centered on (0,0), which is where the biggest bubble
   // gets pinned below — everything else starts near it and drifts outward
@@ -89,6 +84,7 @@ function render(companies, { filtered = false } = {}) {
       x: (Math.random() - 0.5) * 60,
       y: (Math.random() - 0.5) * 60,
     }))
+  renderedNodes = nodes
 
   // The single largest bubble is fixed dead center (d3's fx/fy exempt a node
   // from every force below); every other bubble stays fully mobile, so the
@@ -99,13 +95,10 @@ function render(companies, { filtered = false } = {}) {
   anchor.fy = 0
 
   // Size the view so its own area is a fixed multiple of total bubble area
-  // (packing-density target ~1/PACKING_LOOSENESS) — NOT sqrt(totalArea * k),
-  // which doesn't track area at all and was quietly leaving ~90% of the
-  // canvas empty, forcing the "fix" of an unbounded canvas that zoomed the
-  // whole chart out instead of actually giving the bubbles more room.
-  const PACKING_LOOSENESS = 1.5 // canvasArea ≈ 1.5x totalArea; lower = tighter fit, more overlap risk
+  // (packing-density target ~1/PACKING_LOOSENESS).
+  const PACKING_LOOSENESS = 1.08
   const totalArea = d3.sum(nodes, (d) => Math.PI * d.r ** 2)
-  const half = Math.max(220, Math.min(900, 0.5 * Math.sqrt(PACKING_LOOSENESS * totalArea)))
+  const half = Math.max(45, Math.min(200, 0.5 * Math.sqrt(PACKING_LOOSENESS * totalArea)))
   const viewSize = half * 2
 
   const svg = d3
@@ -113,18 +106,15 @@ function render(companies, { filtered = false } = {}) {
     .append('svg')
     .attr('viewBox', `${-half} ${-half} ${viewSize} ${viewSize}`)
     .attr('width', '100%')
-    .attr('height', Math.min(viewSize, window.innerHeight * 0.88))
-    .style('max-height', '88vh')
+    .attr('height', viewSize)
 
-  const node = svg
+  node = svg
     .selectAll('g.bubble')
     .data(nodes, (d) => d.company_name)
     .join('g')
     .attr('class', 'bubble')
     .style('cursor', 'pointer')
-    .on('click', (event, d) => {
-      window.location.href = `company.html?name=${encodeURIComponent(d.company_name)}`
-    })
+    .on('click', (event, d) => openPanel(d, colorScale))
 
   node
     .append('circle')
@@ -139,41 +129,89 @@ function render(companies, { filtered = false } = {}) {
   const nameText = node
     .append('text')
     .attr('class', 'bubble-name')
-    .text((d) => d.company_name)
     .attr('text-anchor', 'middle')
-    .attr('dy', '-0.2em')
     .attr('fill', '#fff')
-    .attr('font-size', (d) => nameFontScale(d.alumni_count))
+    .attr('font-size', NAME_FONT_SIZE)
     .attr('font-weight', 600)
     .style('pointer-events', 'none')
 
-  node
+  const countText = node
     .append('text')
     .attr('class', 'bubble-count')
     .text((d) => d.alumni_count)
     .attr('text-anchor', 'middle')
-    .attr('dy', '1.1em')
     .attr('fill', '#fff')
     .attr('fill-opacity', 0.85)
-    .attr('font-size', (d) => countFontScale(d.alumni_count))
+    .attr('font-size', COUNT_FONT_SIZE)
     .style('pointer-events', 'none')
 
-  // Shrink-to-fit: measure each name's actual rendered width against the
-  // bubble it's in, and scale both lines of text down together if it
-  // overflows — rather than hiding names in small bubbles altogether.
+  // Wrap each company name onto as many lines as it needs (up to
+  // MAX_NAME_LINES) instead of shrinking the font, so text stays one
+  // consistent size across every bubble. Bubbles too small for even one
+  // line get no text at all.
   nameText.each(function (d) {
-    const maxWidth = d.r * 2 * NAME_WIDTH_FRACTION
-    const measuredWidth = this.getComputedTextLength()
-    if (measuredWidth <= maxWidth) return
+    const textEl = d3.select(this)
+    const nameGroup = d3.select(this.parentNode)
+    const countEl = nameGroup.select('text.bubble-count')
 
-    const scale = maxWidth / measuredWidth
-    const nameEl = d3.select(this)
-    const countEl = d3.select(this.parentNode).select('text.bubble-count')
-    nameEl.attr('font-size', Math.max(MIN_NAME_FONT_SIZE, parseFloat(nameEl.attr('font-size')) * scale))
-    countEl.attr(
-      'font-size',
-      Math.max(MIN_NAME_FONT_SIZE - 1, parseFloat(countEl.attr('font-size')) * scale)
-    )
+    if (d.r < MIN_RADIUS_FOR_TEXT) {
+      countEl.style('display', 'none')
+      return
+    }
+
+    const maxWidth = d.r * 2 * NAME_WIDTH_FRACTION
+    const words = d.company_name.split(/\s+/).filter(Boolean)
+    const lines = []
+    let current = ''
+
+    // Measure using a throwaway tspan on the real (already-styled) text
+    // node, so measurements reflect the actual rendered font.
+    const measure = (t) => {
+      textEl.text(t)
+      return textEl.node().getComputedTextLength()
+    }
+
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word
+      if (measure(candidate) <= maxWidth || !current) {
+        current = candidate
+      } else {
+        lines.push(current)
+        current = word
+      }
+      if (lines.length === MAX_NAME_LINES) break
+    }
+    if (lines.length < MAX_NAME_LINES && current) lines.push(current)
+
+    // Truncate with an ellipsis if there was more text than fit.
+    const consumedWords = lines.join(' ').split(/\s+/).length
+    if (consumedWords < words.length) {
+      let last = lines[lines.length - 1]
+      while (last.length > 1 && measure(`${last}…`) > maxWidth) {
+        last = last.slice(0, -1)
+      }
+      lines[lines.length - 1] = `${last}…`
+    }
+
+    // Only show the alumni count if there's still vertical room below the
+    // wrapped name for it.
+    const showCount = (lines.length + 1) * LINE_HEIGHT <= d.r * 2 * 0.85
+    const totalLines = lines.length + (showCount ? 1 : 0)
+    const startY = -((totalLines - 1) * LINE_HEIGHT) / 2
+
+    textEl.text(null)
+    lines.forEach((line, i) => {
+      textEl
+        .append('tspan')
+        .attr('x', 0)
+        .attr('y', startY + i * LINE_HEIGHT)
+        .text(line)
+    })
+
+    countEl.style('display', showCount ? null : 'none')
+    if (showCount) {
+      countEl.attr('y', startY + lines.length * LINE_HEIGHT)
+    }
   })
 
   const HOVER_GROWTH = 1.12
@@ -196,63 +234,103 @@ function render(companies, { filtered = false } = {}) {
 
   simulation = d3
     .forceSimulation(nodes)
-    .force('x', d3.forceX(0).strength(0.05))
-    .force('y', d3.forceY(0).strength(0.06))
-    .force('charge', d3.forceManyBody().strength(10))
-    .force('collide', d3.forceCollide((d) => d.r + 3).iterations(6))
+    .force('x', d3.forceX(0).strength(0.18))
+    .force('y', d3.forceY(0).strength(0.22))
+    .force('charge', d3.forceManyBody().strength(18))
+    .force('collide', d3.forceCollide((d) => d.r + 0.5).iterations(6))
     .on('tick', () => {
       // No hard position clamp here on purpose: forcing nodes back inside a
       // fixed boundary mid-simulation fights the collision force exactly
       // where the fixed center anchor already crowds everything else, which
       // was producing real, persistent overlaps. Instead the viewBox itself
-      // is refit to the current positions every tick, below — the settled
-      // layout can end up needing more room than the pre-simulation estimate
-      // (PACKING_LOOSENESS is only a starting guess), so this both prevents
-      // bubbles from ever clipping past the edge and keeps the frame as
-      // tight as it can be at every moment, maximizing how much of it the
-      // bubbles actually fill.
-      const requiredHalf =
-        d3.max(nodes, (d) => Math.max(Math.abs(d.x) + d.r, Math.abs(d.y) + d.r)) + 8
-      const requiredSize = requiredHalf * 2
+      // is refit to the current positions every tick, below.
+      //
+      // The viewBox is fit to the bubbles' actual (non-square) bounding
+      // box, and the SVG's pixel height is derived from that box's aspect
+      // ratio against the container's real width — so the box's aspect
+      // ratio always matches what's displayed and the browser never has to
+      // letterbox (pad with blank space) to preserve a mismatched aspect.
+      const PAD = 8
+      const minX = d3.min(nodes, (d) => d.x - d.r) - PAD
+      const maxX = d3.max(nodes, (d) => d.x + d.r) + PAD
+      const minY = d3.min(nodes, (d) => d.y - d.r) - PAD
+      const maxY = d3.max(nodes, (d) => d.y + d.r) + PAD
+      const boxWidth = maxX - minX
+      const boxHeight = maxY - minY
+      const containerWidth = containerEl.clientWidth || boxWidth
+
       svg
-        .attr('viewBox', `${-requiredHalf} ${-requiredHalf} ${requiredSize} ${requiredSize}`)
-        .attr('height', Math.min(requiredSize, window.innerHeight * 0.88))
+        .attr('viewBox', `${minX} ${minY} ${boxWidth} ${boxHeight}`)
+        .attr('height', containerWidth * (boxHeight / boxWidth))
       node.attr('transform', (d) => `translate(${d.x},${d.y})`)
     })
+
+  applyDimming()
 }
 
-function populateIndustryOptions(companies) {
+function openPanel(d, colorScale) {
+  const color = colorScale(d.industry || 'Other')
+  panelTagEl.innerHTML = `<span class="dot" style="background:${color}"></span>${d.industry || 'Other'}`
+  panelNameEl.textContent = d.company_name
+  panelMetaEl.innerHTML = `<b>${d.alumni_count}</b> CBS alumni currently work here`
+  panelCtaEl.href = `company.html?name=${encodeURIComponent(d.company_name)}`
+  panelEl.classList.add('show')
+}
+
+panelCloseEl.addEventListener('click', () => panelEl.classList.remove('show'))
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') panelEl.classList.remove('show')
+})
+
+function renderChips(companies) {
   const industries = [...new Set(companies.map((c) => c.industry).filter(Boolean))].sort()
+  const colorScale = industryColorScale(companies)
+
+  chipsEl.replaceChildren()
+
+  const allChip = document.createElement('div')
+  allChip.className = 'chip' + (activeIndustry === 'all' ? ' active' : '')
+  allChip.textContent = 'All'
+  allChip.onclick = () => {
+    activeIndustry = 'all'
+    renderChips(companies)
+    applyDimming()
+  }
+  chipsEl.append(allChip)
+
   for (const industry of industries) {
-    const option = document.createElement('option')
-    option.value = industry
-    option.textContent = industry
-    industryFilterEl.append(option)
+    const chip = document.createElement('div')
+    chip.className = 'chip' + (activeIndustry === industry ? ' active' : '')
+    chip.innerHTML = `<span class="dot" style="background:${colorScale(industry)}"></span>${industry}`
+    chip.onclick = () => {
+      activeIndustry = industry
+      renderChips(companies)
+      applyDimming()
+    }
+    chipsEl.append(chip)
   }
 }
 
-const BUBBLE_DISPLAY_LIMIT = 25
-
-function applyFilter() {
-  const industry = industryFilterEl.value
+// Filters by dimming bubbles in place, rather than re-running the
+// simulation, so the layout stays stable while the user types or clicks a
+// chip — matching/non-matching bubbles are just toggled visually.
+function applyDimming() {
+  if (!node) return
   const search = searchEl.value.trim().toLowerCase()
+  let anyVisible = false
 
-  let matching = industry ? allCompanies.filter((c) => c.industry === industry) : allCompanies
-  if (search) {
-    matching = matching.filter((c) => c.company_name.toLowerCase().startsWith(search))
-  }
+  node.classed('dim', (d) => {
+    const matchesSearch = !search || d.company_name.toLowerCase().startsWith(search)
+    const matchesIndustry = activeIndustry === 'all' || d.industry === activeIndustry
+    const match = matchesSearch && matchesIndustry
+    if (match) anyVisible = true
+    return !match
+  })
 
-  // Only cap when there'd be too many to show — a filtered-down set under the
-  // limit should render in full, not just whatever survived an earlier cut.
-  const toRender =
-    matching.length > BUBBLE_DISPLAY_LIMIT
-      ? matching.slice().sort((a, b) => b.alumni_count - a.alumni_count).slice(0, BUBBLE_DISPLAY_LIMIT)
-      : matching
-  render(toRender, { filtered: Boolean(industry) })
+  emptyStateEl.classList.toggle('show', !anyVisible)
 }
 
-industryFilterEl.addEventListener('change', applyFilter)
-searchEl.addEventListener('input', applyFilter)
+searchEl.addEventListener('input', applyDimming)
 
 fetch('/api/companies')
   .then((res) => {
@@ -261,8 +339,17 @@ fetch('/api/companies')
   })
   .then((companies) => {
     allCompanies = companies.filter((c) => c.alumni_count > 0)
-    populateIndustryOptions(allCompanies)
-    applyFilter()
+
+    const totalAlumni = d3.sum(allCompanies, (c) => c.alumni_count)
+    statEl.innerHTML = `<b>${allCompanies.length}</b> companies &nbsp;·&nbsp; <b>${totalAlumni}</b> alumni tracked`
+
+    const toRender =
+      allCompanies.length > BUBBLE_DISPLAY_LIMIT
+        ? allCompanies.slice().sort((a, b) => b.alumni_count - a.alumni_count).slice(0, BUBBLE_DISPLAY_LIMIT)
+        : allCompanies
+
+    renderChips(toRender)
+    render(toRender)
   })
   .catch((err) => {
     statusEl.hidden = false
