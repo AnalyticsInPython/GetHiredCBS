@@ -293,7 +293,6 @@ function renderCompanyLogo(logoValue, domain) {
   let index = 0
   logoEl.addEventListener('load', () => {
     logoEl.hidden = false
-    nameEl.hidden = true
   })
   logoEl.addEventListener('error', () => {
     index += 1
@@ -301,7 +300,6 @@ function renderCompanyLogo(logoValue, domain) {
       logoEl.src = candidates[index]
     } else {
       logoEl.hidden = true
-      nameEl.hidden = false
     }
   })
   logoEl.src = candidates[index]

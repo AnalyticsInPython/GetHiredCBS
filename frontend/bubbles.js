@@ -6,8 +6,15 @@ const chipsEl = document.getElementById('industry-chips')
 const statEl = document.getElementById('stat')
 const panelEl = document.getElementById('panel')
 const panelTagEl = document.getElementById('panel-tag')
+const panelLogoEl = document.getElementById('panel-logo')
 const panelNameEl = document.getElementById('panel-name')
+const panelDomainEl = document.getElementById('panel-domain')
 const panelMetaEl = document.getElementById('panel-meta')
+const panelFactsEl = document.getElementById('panel-facts')
+const panelIndustryEl = document.getElementById('panel-industry')
+const panelSizeEl = document.getElementById('panel-size')
+const panelHeadquartersEl = document.getElementById('panel-headquarters')
+const panelFoundedEl = document.getElementById('panel-founded')
 const panelCtaEl = document.getElementById('panel-cta')
 const panelCloseEl = document.getElementById('panel-close')
 
@@ -15,6 +22,9 @@ let allCompanies = []
 let node = null
 let simulation = null
 let activeIndustry = 'all'
+// Bumped on every panel open so a slow enrichment fetch for a company the
+// user has since clicked away from can't land its data in the panel late.
+let panelRequestToken = 0
 // Built once from every company, so an industry keeps the same color no
 // matter what's currently filtered/visible — a scale built from just the
 // currently-shown subset reassigns colors as that subset's set of
@@ -26,13 +36,15 @@ const MIN_RADIUS = 4
 const MAX_RADIUS = 34
 const BUBBLE_DISPLAY_LIMIT = 25
 
-// One fixed font size for every bubble — names that don't fit wrap onto
-// additional lines instead of shrinking, so text weight/size stays
-// consistent across the whole chart.
-const NAME_FONT_SIZE = 5
-const COUNT_FONT_SIZE = 4
-const LINE_HEIGHT = NAME_FONT_SIZE * 1.2
-const MAX_NAME_LINES = 3
+// Font size scales with each bubble's own radius — bigger bubbles get
+// bigger text — and then shrinks further per-name (down to
+// FLOOR_NAME_FONT_SIZE) whenever needed so the full company name always
+// wraps to fit, instead of ever being cut off with an ellipsis.
+const MIN_NAME_FONT_SIZE = 3.4
+const MAX_NAME_FONT_SIZE = 7
+const FLOOR_NAME_FONT_SIZE = 2.2
+const FONT_SHRINK_STEP = 0.25
+const COUNT_FONT_RATIO = 0.75
 
 // How much of a bubble's diameter a line of text is allowed to use before
 // wrapping to the next line.
@@ -74,6 +86,13 @@ function radiusScale(companies) {
 function industryColorScale(companies) {
   const industries = [...new Set(companies.map((c) => c.industry || 'Other'))].sort()
   return d3.scaleOrdinal().domain(industries).range(PALETTE)
+}
+
+// Bigger bubbles get bigger name text; radii at or below MIN_RADIUS_FOR_TEXT
+// (which get no text at all) map to the smallest size.
+function nameFontScale(r) {
+  const t = Math.min(1, Math.max(0, (r - MIN_RADIUS_FOR_TEXT) / (MAX_RADIUS - MIN_RADIUS_FOR_TEXT)))
+  return MIN_NAME_FONT_SIZE + t * (MAX_NAME_FONT_SIZE - MIN_NAME_FONT_SIZE)
 }
 
 // Renders exactly the given companies as bubbles — callers (applyFilter,
@@ -166,7 +185,7 @@ function render(companies) {
     .attr('class', 'bubble-name')
     .attr('text-anchor', 'middle')
     .attr('fill', '#fff')
-    .attr('font-size', NAME_FONT_SIZE)
+    .attr('font-size', (d) => nameFontScale(d.r))
     .attr('font-weight', 600)
     .style('pointer-events', 'none')
 
@@ -177,13 +196,13 @@ function render(companies) {
     .attr('text-anchor', 'middle')
     .attr('fill', '#fff')
     .attr('fill-opacity', 0.85)
-    .attr('font-size', COUNT_FONT_SIZE)
+    .attr('font-size', (d) => nameFontScale(d.r) * COUNT_FONT_RATIO)
     .style('pointer-events', 'none')
 
-  // Wrap each company name onto as many lines as it needs (up to
-  // MAX_NAME_LINES) instead of shrinking the font, so text stays one
-  // consistent size across every bubble. Bubbles too small for even one
-  // line get no text at all.
+  // Wrap each company name to fit its own bubble, shrinking the font size
+  // (down to FLOOR_NAME_FONT_SIZE) as far as needed so every word wraps in —
+  // never cutting the name short with an ellipsis. Bubbles too small for
+  // even one line get no text at all.
   nameText.each(function (d) {
     const textEl = d3.select(this)
     const nameGroup = d3.select(this.parentNode)
@@ -195,72 +214,80 @@ function render(companies) {
     }
 
     const maxWidth = d.r * 2 * NAME_WIDTH_FRACTION
+    const maxHeight = d.r * 2 * 0.85
     const words = d.company_name.split(/\s+/).filter(Boolean)
-    const lines = []
-    let current = ''
 
-    // Measure using a throwaway tspan on the real (already-styled) text
-    // node, so measurements reflect the actual rendered font.
+    // Measure using the real (already-styled) text node, so measurements
+    // reflect the actual rendered font at whatever size is currently set.
     const measure = (t) => {
       textEl.text(t)
       return textEl.node().getComputedTextLength()
     }
 
-    // A word alone wider than the bubble can hold has no word boundary left
-    // to wrap on — truncate it in place rather than letting it overflow.
-    const fitWord = (word) => {
-      if (measure(word) <= maxWidth) return word
-      let truncated = word
-      while (truncated.length > 1 && measure(`${truncated}…`) > maxWidth) {
-        truncated = truncated.slice(0, -1)
+    // Greedily wraps words at the given width. Normally bails out (returns
+    // null) if a single word alone is too wide, so the caller can shrink the
+    // font and retry — unless allowOverflow is set, in which case that word
+    // just gets its own (possibly overflowing) line instead of being cut.
+    const wrapWords = (maxW, allowOverflow) => {
+      const result = []
+      let current = ''
+      for (const word of words) {
+        if (!allowOverflow && measure(word) > maxW) return null
+        const candidate = current ? `${current} ${word}` : word
+        if (current && measure(candidate) <= maxW) {
+          current = candidate
+        } else {
+          if (current) result.push(current)
+          current = word
+        }
       }
-      return `${truncated}…`
+      if (current) result.push(current)
+      return result
     }
 
-    for (const word of words) {
-      const candidate = current ? `${current} ${word}` : word
-      if (current && measure(candidate) <= maxWidth) {
-        current = candidate
-      } else {
-        // Starting a fresh line — with either the very first word, or this
-        // word after the previous line filled up — so it needs the same
-        // overflow check a lone starting word always needs.
-        if (current) lines.push(current)
-        current = fitWord(word)
+    // Start from a font size proportional to this bubble's own radius, then
+    // shrink until the full name wraps within it both horizontally and
+    // vertically.
+    let fontSize = nameFontScale(d.r)
+    let lines = null
+    for (; fontSize >= FLOOR_NAME_FONT_SIZE; fontSize -= FONT_SHRINK_STEP) {
+      textEl.attr('font-size', fontSize)
+      const wrapped = wrapWords(maxWidth)
+      if (wrapped && wrapped.length * (fontSize * 1.2) <= maxHeight) {
+        lines = wrapped
+        break
       }
-      if (lines.length === MAX_NAME_LINES) break
     }
-    if (lines.length < MAX_NAME_LINES && current) lines.push(current)
+    // Last resort for a pathologically long single word in a tiny bubble:
+    // render at the floor size and let that one word overflow the bubble's
+    // circle slightly, rather than ever truncating the name.
+    if (!lines) {
+      fontSize = FLOOR_NAME_FONT_SIZE
+      textEl.attr('font-size', fontSize)
+      lines = wrapWords(maxWidth, true)
+    }
 
-    // Truncate with an ellipsis if there was more text than fit.
-    const consumedWords = lines.join(' ').split(/\s+/).length
-    if (consumedWords < words.length) {
-      let last = lines[lines.length - 1]
-      if (last.endsWith('…')) last = last.slice(0, -1)
-      while (last.length > 1 && measure(`${last}…`) > maxWidth) {
-        last = last.slice(0, -1)
-      }
-      lines[lines.length - 1] = `${last}…`
-    }
+    const lineHeight = fontSize * 1.2
 
     // Only show the alumni count if there's still vertical room below the
     // wrapped name for it.
-    const showCount = (lines.length + 1) * LINE_HEIGHT <= d.r * 2 * 0.85
+    const showCount = (lines.length + 1) * lineHeight <= maxHeight
     const totalLines = lines.length + (showCount ? 1 : 0)
-    const startY = -((totalLines - 1) * LINE_HEIGHT) / 2
+    const startY = -((totalLines - 1) * lineHeight) / 2
 
     textEl.text(null)
     lines.forEach((line, i) => {
       textEl
         .append('tspan')
         .attr('x', 0)
-        .attr('y', startY + i * LINE_HEIGHT)
+        .attr('y', startY + i * lineHeight)
         .text(line)
     })
 
+    countEl.attr('font-size', fontSize * COUNT_FONT_RATIO)
     countEl.style('display', showCount ? null : 'none')
     if (showCount) {
-      countEl.attr('y', startY + lines.length * LINE_HEIGHT)
+      countEl.attr('y', startY + lines.length * lineHeight)
     }
   })
 
@@ -316,6 +343,74 @@ function render(companies) {
     })
 }
 
+function safeExternalUrl(value) {
+  if (!value) return null
+  const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`
+  try {
+    const url = new URL(candidate)
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : null
+  } catch {
+    return null
+  }
+}
+
+function setPanelFact(ddEl, value) {
+  const hasValue = value !== null && value !== undefined && value !== ''
+  ddEl.closest('.panel-fact').hidden = !hasValue
+  ddEl.textContent = hasValue ? value : ''
+}
+
+function renderPanelLogo(logoValue, domain) {
+  const abstractLogoUrl = safeExternalUrl(logoValue)
+  const faviconFallback = domain
+    ? `https://www.google.com/s2/favicons?sz=128&domain_url=${encodeURIComponent(`https://${domain}`)}`
+    : null
+  const candidates = [abstractLogoUrl, faviconFallback].filter(Boolean)
+  if (!candidates.length) return
+
+  let index = 0
+  panelLogoEl.onload = () => {
+    panelLogoEl.hidden = false
+  }
+  panelLogoEl.onerror = () => {
+    index += 1
+    if (index < candidates.length) {
+      panelLogoEl.src = candidates[index]
+    } else {
+      panelLogoEl.hidden = true
+    }
+  }
+  panelLogoEl.src = candidates[index]
+}
+
+// Populates the mini panel's logo/website/facts from the same enrichment
+// endpoint the in-depth company detail page uses — a subset (industry,
+// size, headquarters, founded) of what that page shows in full.
+function renderPanelEnrichment(result) {
+  if (!result || !result.available || !result.data) return
+  const data = result.data
+
+  setPanelFact(panelIndustryEl, data.industry)
+  const employeeCount =
+    typeof data.employee_count === 'number' ? data.employee_count.toLocaleString() : data.employee_count
+  setPanelFact(panelSizeEl, data.employee_range || employeeCount)
+  setPanelFact(panelHeadquartersEl, [data.city, data.state, data.country].filter(Boolean).join(', '))
+  setPanelFact(panelFoundedEl, data.year_founded)
+  panelFactsEl.hidden = ![panelIndustryEl, panelSizeEl, panelHeadquartersEl, panelFoundedEl].some(
+    (el) => !el.closest('.panel-fact').hidden
+  )
+
+  const domainUrl = safeExternalUrl(result.domain)
+  if (domainUrl) {
+    panelDomainEl.href = domainUrl
+    panelDomainEl.textContent = result.domain
+    panelDomainEl.hidden = false
+  }
+
+  panelLogoEl.alt = `${data.company_name || ''} logo`
+  renderPanelLogo(data.logo, result.domain)
+}
+
 function openPanel(d, colorScale) {
   const color = colorScale(d.industry || 'Other')
   panelTagEl.innerHTML = `<span class="dot" style="background:${color}"></span>${d.industry || 'Other'}`
@@ -323,6 +418,22 @@ function openPanel(d, colorScale) {
   panelMetaEl.innerHTML = `<b>${d.alumni_count}</b> CBS alumni currently work here`
   panelCtaEl.href = `company.html?name=${encodeURIComponent(d.company_name)}`
   panelEl.classList.add('show')
+
+  // Clear the previous company's logo/website/facts immediately so nothing
+  // stale is visible while this company's enrichment loads.
+  panelLogoEl.hidden = true
+  panelLogoEl.removeAttribute('src')
+  panelDomainEl.hidden = true
+  panelFactsEl.hidden = true
+
+  const requestId = ++panelRequestToken
+  fetch(`/api/companies/${encodeURIComponent(d.company_name)}/enrichment`)
+    .then((res) => (res.ok ? res.json() : null))
+    .then((result) => {
+      if (requestId !== panelRequestToken) return
+      renderPanelEnrichment(result)
+    })
+    .catch(() => {})
 }
 
 panelCloseEl.addEventListener('click', () => panelEl.classList.remove('show'))
