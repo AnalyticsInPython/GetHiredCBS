@@ -15,10 +15,7 @@
 <body>
   <header>
     <h1>GetHiredCBS</h1>
-    <p class="sub">
-      A look at where Columbia Business School alumni are working right now. Bubble size shows how
-      many alumni are there. Click a company for details.
-    </p>
+    <p class="sub">A look at where Columbia Business School alumni are working right now.</p>
     <div id="stat"></div>
   </header>
 
@@ -30,20 +27,24 @@
       </svg>
       <input type="search" id="company-search" placeholder="Search companies" autocomplete="off" />
     </div>
+    <p class="filter-label">Industry</p>
     <div class="chips" id="industry-chips"></div>
   </div>
 
+  <p class="canvas-caption">Bubble size shows how many alumni work there. Click a bubble for details.</p>
+
   <div class="canvas-outer">
-    <div class="canvas-wrap">
-      <p id="status">Loading…</p>
-      <div id="bubbles" class="bubble-field" hidden></div>
-      <div class="empty-state" id="empty-state">
-        <b>No companies match</b>
-        <span>Try a different name or industry.</span>
+    <div class="canvas-row">
+      <div class="canvas-wrap">
+        <p id="status">Loading…</p>
+        <div id="bubbles" class="bubble-field" hidden></div>
+        <div class="empty-state" id="empty-state">
+          <b>No companies match</b>
+          <span>Try a different name or industry.</span>
+        </div>
       </div>
     </div>
   </div>
-  <p class="legend-caption">Bubble color shows industry. Click a chip above to filter by one.</p>
 
   <div class="panel" id="panel">
     <button class="close" id="panel-close" aria-label="Close">&times;</button>

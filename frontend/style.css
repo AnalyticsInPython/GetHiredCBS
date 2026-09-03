@@ -212,6 +212,13 @@ main {
   box-shadow: 0 0 0 3px rgba(47, 93, 58, 0.12);
 }
 
+.filter-label {
+  margin: 0.2rem 0 -0.4rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -264,10 +271,23 @@ main {
   padding: 0 2rem;
 }
 
+.canvas-caption {
+  max-width: 810px;
+  margin: 1rem auto 0;
+  padding: 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.canvas-row {
+  max-width: 810px;
+  margin: 0.6rem auto 0;
+}
+
 .canvas-wrap {
-  max-width: 704px;
+  width: 100%;
   min-height: 320px;
-  margin: 0.75rem auto;
   position: relative;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -286,15 +306,6 @@ main {
 
 .bubble circle {
   transition: r 0.15s ease, fill-opacity 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
-}
-
-.legend-caption {
-  max-width: 704px;
-  margin: 0 auto;
-  padding: 0.3rem 0 1.5rem;
-  font-size: 0.8rem;
-  color: #948c74;
-  text-align: center;
 }
 
 .panel {
