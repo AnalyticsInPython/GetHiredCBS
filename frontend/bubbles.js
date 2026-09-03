@@ -16,6 +16,12 @@ let renderedNodes = []
 let node = null
 let simulation = null
 let activeIndustry = 'all'
+// Built once from every company, so an industry keeps the same color no
+// matter what's currently filtered/visible — a scale built from just the
+// currently-shown subset reassigns colors as that subset's set of
+// industries changes (e.g. searching down to one company would always
+// render it as the first palette color, regardless of its real industry).
+let globalColorScale = null
 
 const MIN_RADIUS = 4
 const MAX_RADIUS = 34
@@ -37,10 +43,25 @@ const NAME_WIDTH_FRACTION = 0.82
 // RADIUS) don't get any text at all — there's no room to wrap into.
 const MIN_RADIUS_FOR_TEXT = 9
 
-// Fixed, readable categorical palette — used so color carries information
-// (which industry a bubble belongs to), cycling if there are more
-// industries in the data than swatches.
-const PALETTE = ['#375D8C', '#1F8A78', '#A6414F', '#C89B3C', '#6A4E8C', '#B5502E', '#708238', '#A9762C']
+// One color per industry — 11 swatches for the 11 industries the data
+// actually has, so none has to repeat (a shorter list cycles and silently
+// gives two unrelated industries the same color). All 11 share the same
+// saturation/lightness (evenly-spaced hues, muted 40%/45% HSL) so they read
+// as one cohesive, soft-toned set rather than a mix of harsher, unevenly
+// saturated colors.
+const PALETTE = [
+  '#A14545', // dusty red / terracotta
+  '#A17345', // dusty orange-brown
+  '#A1A145', // dusty olive
+  '#73A145', // dusty yellow-green
+  '#45A145', // dusty green
+  '#45A173', // dusty teal-green
+  '#45A1A1', // dusty teal
+  '#4573A1', // dusty steel blue
+  '#4545A1', // dusty indigo
+  '#7345A1', // dusty violet
+  '#A14573', // dusty rose
+]
 
 function radiusScale(companies) {
   const max = d3.max(companies, (d) => d.alumni_count) || 1
@@ -69,7 +90,7 @@ function render(companies) {
   containerEl.hidden = false
 
   const rScale = radiusScale(companies)
-  const colorScale = industryColorScale(companies)
+  const colorScale = globalColorScale
   const colorFor = (d) => colorScale(d.industry || 'Other')
 
   // Coordinates are centered on (0,0), which is where the biggest bubble
@@ -264,8 +285,6 @@ function render(companies) {
         .attr('height', containerWidth * (boxHeight / boxWidth))
       node.attr('transform', (d) => `translate(${d.x},${d.y})`)
     })
-
-  applyDimming()
 }
 
 function openPanel(d, colorScale) {
@@ -284,7 +303,7 @@ document.addEventListener('keydown', (e) => {
 
 function renderChips(companies) {
   const industries = [...new Set(companies.map((c) => c.industry).filter(Boolean))].sort()
-  const colorScale = industryColorScale(companies)
+  const colorScale = globalColorScale
 
   chipsEl.replaceChildren()
 
@@ -294,7 +313,7 @@ function renderChips(companies) {
   allChip.onclick = () => {
     activeIndustry = 'all'
     renderChips(companies)
-    applyDimming()
+    applyFilter()
   }
   chipsEl.append(allChip)
 
@@ -305,32 +324,64 @@ function renderChips(companies) {
     chip.onclick = () => {
       activeIndustry = industry
       renderChips(companies)
-      applyDimming()
+      applyFilter()
     }
     chipsEl.append(chip)
   }
 }
 
-// Filters by dimming bubbles in place, rather than re-running the
-// simulation, so the layout stays stable while the user types or clicks a
-// chip — matching/non-matching bubbles are just toggled visually.
-function applyDimming() {
-  if (!node) return
+// Matching companies against the search/industry filters, out of the full
+// list — not just whatever happened to already be on screen — so a search
+// can surface smaller companies that never made the initial top-25 cut.
+// Still capped to BUBBLE_DISPLAY_LIMIT, but only when the filtered result
+// itself is over that limit (i.e. no filter active), never below it.
+function computeVisibleCompanies() {
   const search = searchEl.value.trim().toLowerCase()
-  let anyVisible = false
-
-  node.classed('dim', (d) => {
-    const matchesSearch = !search || d.company_name.toLowerCase().startsWith(search)
-    const matchesIndustry = activeIndustry === 'all' || d.industry === activeIndustry
-    const match = matchesSearch && matchesIndustry
-    if (match) anyVisible = true
-    return !match
+  const matches = allCompanies.filter((c) => {
+    const matchesSearch = !search || c.company_name.toLowerCase().startsWith(search)
+    const matchesIndustry = activeIndustry === 'all' || c.industry === activeIndustry
+    return matchesSearch && matchesIndustry
   })
-
-  emptyStateEl.classList.toggle('show', !anyVisible)
+  return matches.length > BUBBLE_DISPLAY_LIMIT
+    ? matches.slice().sort((a, b) => b.alumni_count - a.alumni_count).slice(0, BUBBLE_DISPLAY_LIMIT)
+    : matches
 }
 
-searchEl.addEventListener('input', applyDimming)
+// Re-renders with just the matching companies — non-matching bubbles are
+// actually removed, not dimmed, so a search/chip filter can bring a small
+// company's bubble into existence rather than just toggling visibility on
+// whatever bubbles already happened to be on screen.
+function applyFilter() {
+  const visible = computeVisibleCompanies()
+
+  if (visible.length === 0) {
+    if (simulation) simulation.stop()
+    containerEl.replaceChildren()
+    containerEl.hidden = true
+    statusEl.hidden = true
+    panelEl.classList.remove('show')
+    node = null
+    renderedNodes = []
+    emptyStateEl.classList.add('show')
+    return
+  }
+
+  emptyStateEl.classList.remove('show')
+  render(visible)
+}
+
+function debounce(fn, delayMs) {
+  let timer
+  return (...args) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => fn(...args), delayMs)
+  }
+}
+
+// Debounced so fast typing doesn't tear down and restart the bubble
+// simulation on every keystroke — chip clicks (single, discrete) go
+// straight to applyFilter with no delay.
+searchEl.addEventListener('input', debounce(applyFilter, 150))
 
 fetch('/api/companies')
   .then((res) => {
@@ -339,17 +390,13 @@ fetch('/api/companies')
   })
   .then((companies) => {
     allCompanies = companies.filter((c) => c.alumni_count > 0)
+    globalColorScale = industryColorScale(allCompanies)
 
     const totalAlumni = d3.sum(allCompanies, (c) => c.alumni_count)
     statEl.innerHTML = `<b>${allCompanies.length}</b> companies &nbsp;·&nbsp; <b>${totalAlumni}</b> alumni tracked`
 
-    const toRender =
-      allCompanies.length > BUBBLE_DISPLAY_LIMIT
-        ? allCompanies.slice().sort((a, b) => b.alumni_count - a.alumni_count).slice(0, BUBBLE_DISPLAY_LIMIT)
-        : allCompanies
-
-    renderChips(toRender)
-    render(toRender)
+    renderChips(allCompanies)
+    applyFilter()
   })
   .catch((err) => {
     statusEl.hidden = false

@@ -3,10 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <title>Company — GetHiredCBS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
+  <header class="detail-header">
     <nav><a href="index.html">← Back to companies</a></nav>
     <div class="company-heading">
       <img id="company-logo" class="company-logo" alt="" hidden />
@@ -18,27 +23,30 @@
   </header>
 
   <main>
-    <p id="status"></p>
-    <dl id="company-facts" class="fact-list" hidden>
-      <dt hidden>Industry</dt>
-      <dd id="industry" hidden></dd>
-      <dt hidden>Size</dt>
-      <dd id="company-size" hidden></dd>
-      <dt hidden>Headquarters</dt>
-      <dd id="headquarters" hidden></dd>
-      <dt hidden>Founded</dt>
-      <dd id="year-founded" hidden></dd>
-      <dt hidden>Revenue</dt>
-      <dd id="revenue" hidden></dd>
-      <dt hidden>Company type</dt>
-      <dd id="company-type" hidden></dd>
-    </dl>
-    <p id="company-description" class="company-description" hidden></p>
-    <p id="enrichment-status" class="note">Loading company enrichment…</p>
+    <p id="status" class="page-status"></p>
 
-    <section id="alumni-section">
+    <section class="panel-card summary-card">
+      <dl id="company-facts" class="fact-list" hidden>
+        <dt hidden>Industry</dt>
+        <dd id="industry" hidden></dd>
+        <dt hidden>Size</dt>
+        <dd id="company-size" hidden></dd>
+        <dt hidden>Headquarters</dt>
+        <dd id="headquarters" hidden></dd>
+        <dt hidden>Founded</dt>
+        <dd id="year-founded" hidden></dd>
+        <dt hidden>Revenue</dt>
+        <dd id="revenue" hidden></dd>
+        <dt hidden>Company type</dt>
+        <dd id="company-type" hidden></dd>
+      </dl>
+      <p id="company-description" class="company-description" hidden></p>
+      <p id="enrichment-status" class="note">Loading company enrichment…</p>
+    </section>
+
+    <section id="alumni-section" class="panel-card">
       <h2>Alumni working here</h2>
-      <p id="alumni-status">Loading…</p>
+      <p id="alumni-status" class="section-status">Loading…</p>
       <div id="alumni-layout" hidden>
         <div class="alumni-main">
           <div id="alumni-controls" class="alumni-controls">
@@ -60,20 +68,20 @@
       </div>
     </section>
 
-    <section id="roles-section" hidden>
+    <section id="roles-section" class="panel-card" hidden>
       <h2>Comparable roles</h2>
       <ul id="roles-list" class="role-list"></ul>
     </section>
 
-    <section id="other-data-section" hidden>
+    <section id="other-data-section" class="panel-card" hidden>
       <h2>Other enrichment data</h2>
       <div id="tags" class="tag-list"></div>
       <div id="company-links" class="company-links"></div>
     </section>
 
-    <section id="jobs-section">
+    <section id="jobs-section" class="panel-card">
       <h2>Open roles</h2>
-      <p id="jobs-status">Loading job postings…</p>
+      <p id="jobs-status" class="section-status">Loading job postings…</p>
       <p id="jobs-warning" class="note" hidden></p>
       <ul id="jobs-list" class="job-list" hidden></ul>
     </section>

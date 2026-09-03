@@ -42,36 +42,45 @@ function renderAlumnus(alum) {
   const card = document.createElement('div')
   card.className = 'alumni-card'
 
+  const avatar = document.createElement('div')
+  avatar.className = 'alumni-avatar'
+  avatar.textContent = `${alum.first_name[0] || ''}${alum.last_name[0] || ''}`
+  card.append(avatar)
+
+  const body = document.createElement('div')
+  body.className = 'alumni-body'
+
   const name = document.createElement('div')
   name.className = 'alumni-name'
   name.textContent = `${alum.first_name} ${alum.last_name}`
-  card.append(name)
+  body.append(name)
 
   const grad = document.createElement('div')
   grad.className = 'alumni-meta'
   grad.textContent = `Class of ${alum.graduating_year}`
-  card.append(grad)
+  body.append(grad)
 
   if (alum.ft_title) {
     const title = document.createElement('div')
     title.className = 'alumni-meta'
     title.textContent = `Title: ${alum.ft_title}`
-    card.append(title)
+    body.append(title)
   }
 
   if (alum.ft_function) {
     const fn = document.createElement('div')
     fn.className = 'alumni-meta'
     fn.textContent = `Function: ${alum.ft_function}`
-    card.append(fn)
+    body.append(fn)
   }
 
   const email = document.createElement('a')
   email.className = 'alumni-email'
   email.href = `mailto:${alum.email}`
   email.textContent = alum.email
-  card.append(email)
+  body.append(email)
 
+  card.append(body)
   return card
 }
 
@@ -309,7 +318,9 @@ function renderEnrichment(result) {
   enrichmentStatusEl.hidden = true
   factsEl.hidden = false
   setOptionalFact(industryEl, data.industry)
-  setOptionalFact(sizeEl, data.employee_range || data.employee_count)
+  const employeeCount =
+    typeof data.employee_count === 'number' ? data.employee_count.toLocaleString() : data.employee_count
+  setOptionalFact(sizeEl, data.employee_range || employeeCount)
   setOptionalFact(
     headquartersEl,
     [data.city, data.state, data.country].filter(Boolean).join(', ')
