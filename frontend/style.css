@@ -266,6 +266,7 @@ main {
 
 .canvas-wrap {
   max-width: 704px;
+  min-height: 320px;
   margin: 0.75rem auto;
   position: relative;
   background: var(--panel);

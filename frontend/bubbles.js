@@ -12,7 +12,6 @@ const panelCtaEl = document.getElementById('panel-cta')
 const panelCloseEl = document.getElementById('panel-close')
 
 let allCompanies = []
-let renderedNodes = []
 let node = null
 let simulation = null
 let activeIndustry = 'all'
@@ -23,15 +22,15 @@ let activeIndustry = 'all'
 // render it as the first palette color, regardless of its real industry).
 let globalColorScale = null
 
-const MIN_RADIUS = 3.3
-const MAX_RADIUS = 26.4
+const MIN_RADIUS = 4
+const MAX_RADIUS = 34
 const BUBBLE_DISPLAY_LIMIT = 25
 
 // One fixed font size for every bubble — names that don't fit wrap onto
 // additional lines instead of shrinking, so text weight/size stays
 // consistent across the whole chart.
-const NAME_FONT_SIZE = 4
-const COUNT_FONT_SIZE = 3.3
+const NAME_FONT_SIZE = 5
+const COUNT_FONT_SIZE = 4
 const LINE_HEIGHT = NAME_FONT_SIZE * 1.2
 const MAX_NAME_LINES = 3
 
@@ -41,7 +40,7 @@ const NAME_WIDTH_FRACTION = 0.82
 
 // Bubbles smaller than this (radius, in the same user units as MIN/MAX
 // RADIUS) don't get any text at all — there's no room to wrap into.
-const MIN_RADIUS_FOR_TEXT = 7.2
+const MIN_RADIUS_FOR_TEXT = 9
 
 // How many steps to advance the force simulation before anything is drawn,
 // so bubbles appear already settled instead of visibly jiggling into place.
@@ -77,19 +76,12 @@ function industryColorScale(companies) {
   return d3.scaleOrdinal().domain(industries).range(PALETTE)
 }
 
+// Renders exactly the given companies as bubbles — callers (applyFilter,
+// below) are responsible for handling the empty case before reaching here.
 function render(companies) {
   containerEl.replaceChildren()
   if (simulation) simulation.stop()
   panelEl.classList.remove('show')
-
-  if (companies.length === 0) {
-    containerEl.hidden = true
-    statusEl.hidden = false
-    statusEl.textContent = 'No companies to show.'
-    node = null
-    renderedNodes = []
-    return
-  }
   statusEl.hidden = true
   containerEl.hidden = false
 
@@ -109,7 +101,6 @@ function render(companies) {
       x: (Math.random() - 0.5) * 60,
       y: (Math.random() - 0.5) * 60,
     }))
-  renderedNodes = nodes
 
   // The single largest bubble is fixed dead center (d3's fx/fy exempt a node
   // from every force below); every other bubble stays fully mobile, so the
@@ -215,13 +206,27 @@ function render(companies) {
       return textEl.node().getComputedTextLength()
     }
 
+    // A word alone wider than the bubble can hold has no word boundary left
+    // to wrap on — truncate it in place rather than letting it overflow.
+    const fitWord = (word) => {
+      if (measure(word) <= maxWidth) return word
+      let truncated = word
+      while (truncated.length > 1 && measure(`${truncated}…`) > maxWidth) {
+        truncated = truncated.slice(0, -1)
+      }
+      return `${truncated}…`
+    }
+
     for (const word of words) {
       const candidate = current ? `${current} ${word}` : word
-      if (measure(candidate) <= maxWidth || !current) {
+      if (current && measure(candidate) <= maxWidth) {
         current = candidate
       } else {
-        lines.push(current)
-        current = word
+        // Starting a fresh line — with either the very first word, or this
+        // word after the previous line filled up — so it needs the same
+        // overflow check a lone starting word always needs.
+        if (current) lines.push(current)
+        current = fitWord(word)
       }
       if (lines.length === MAX_NAME_LINES) break
     }
@@ -231,6 +236,7 @@ function render(companies) {
     const consumedWords = lines.join(' ').split(/\s+/).length
     if (consumedWords < words.length) {
       let last = lines[lines.length - 1]
+      if (last.endsWith('…')) last = last.slice(0, -1)
       while (last.length > 1 && measure(`${last}…`) > maxWidth) {
         last = last.slice(0, -1)
       }
@@ -308,8 +314,6 @@ function render(companies) {
         .attr('height', containerWidth * (boxHeight / boxWidth))
       node.attr('transform', (d) => `translate(${d.x},${d.y})`)
     })
-
-  applyDimming()
 }
 
 function openPanel(d, colorScale) {
@@ -355,21 +359,35 @@ function renderChips(companies) {
   }
 }
 
-// Filters by dimming bubbles in place, rather than re-running the
-// simulation, so the layout stays stable while the user types or clicks a
-// chip — matching/non-matching bubbles are just toggled visually.
-function applyDimming() {
-  if (!node) return
+// Matches companies against the search/industry filters out of the full
+// list — not just whatever's currently on screen — so a search can surface
+// a smaller company that never made the initial top-25 cut. Still capped to
+// BUBBLE_DISPLAY_LIMIT, but only when the filtered result itself is over
+// that limit (i.e. no filter active), never below it. Non-matching bubbles
+// are actually removed via a fresh render(), not dimmed in place.
+function applyFilter() {
   const search = searchEl.value.trim().toLowerCase()
-  let anyVisible = false
-
-  node.classed('dim', (d) => {
-    const matchesSearch = !search || d.company_name.toLowerCase().startsWith(search)
-    const matchesIndustry = activeIndustry === 'all' || d.industry === activeIndustry
-    const match = matchesSearch && matchesIndustry
-    if (match) anyVisible = true
-    return !match
+  const matches = allCompanies.filter((c) => {
+    const matchesSearch = !search || c.company_name.toLowerCase().startsWith(search)
+    const matchesIndustry = activeIndustry === 'all' || c.industry === activeIndustry
+    return matchesSearch && matchesIndustry
   })
+
+  const visible =
+    matches.length > BUBBLE_DISPLAY_LIMIT
+      ? matches.slice().sort((a, b) => b.alumni_count - a.alumni_count).slice(0, BUBBLE_DISPLAY_LIMIT)
+      : matches
+
+  if (visible.length === 0) {
+    if (simulation) simulation.stop()
+    containerEl.replaceChildren()
+    containerEl.hidden = true
+    statusEl.hidden = true
+    panelEl.classList.remove('show')
+    node = null
+    emptyStateEl.classList.add('show')
+    return
+  }
 
   emptyStateEl.classList.remove('show')
   render(visible)
