@@ -350,18 +350,38 @@ main {
   border-radius: 50%;
 }
 
+.panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.panel-logo {
+  min-width: 48px;
+  width: 48px;
+  height: 48px;
+  padding: 0.35rem;
+  border-radius: 12px;
+}
+
 .panel h3 {
   font-family: 'Fraunces', serif;
   font-size: 1.5rem;
-  margin: 1rem 0 0.25rem;
+  margin: 0 0 0.15rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.panel .company-domain {
+  margin-top: 0;
+  font-size: 0.82rem;
 }
 
 .panel .count-line {
   color: var(--muted);
   font-size: 0.9rem;
-  margin-bottom: 1.4rem;
+  margin: 0.6rem 0 1rem;
 }
 
 .panel .count-line b {
@@ -434,6 +454,29 @@ main {
   font-size: 1rem;
   font-weight: 600;
   color: var(--ink);
+}
+
+/* The mini panel is far narrower than the detail page's main column, so its
+   facts stack in one vertical column (one fact per row) instead of the
+   detail page's side-by-side grid — there's no horizontal room for that
+   here, and forcing it caused facts to overflow the panel's fixed width. */
+#panel-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+#panel-facts .panel-fact {
+  min-width: 0;
+}
+
+#panel-facts dt {
+  margin: 0;
+}
+
+#panel-facts dd {
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
 }
 
 .company-description {
