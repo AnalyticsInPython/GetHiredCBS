@@ -32,17 +32,17 @@ let panelRequestToken = 0
 // render it as the first palette color, regardless of its real industry).
 let globalColorScale = null
 
-const MIN_RADIUS = 4
-const MAX_RADIUS = 34
+const MIN_RADIUS = 4.6
+const MAX_RADIUS = 39.1
 const BUBBLE_DISPLAY_LIMIT = 25
 
 // Font size scales with each bubble's own radius — bigger bubbles get
 // bigger text — and then shrinks further per-name (down to
 // FLOOR_NAME_FONT_SIZE) whenever needed so the full company name always
 // wraps to fit, instead of ever being cut off with an ellipsis.
-const MIN_NAME_FONT_SIZE = 3.4
-const MAX_NAME_FONT_SIZE = 7
-const FLOOR_NAME_FONT_SIZE = 2.2
+const MIN_NAME_FONT_SIZE = 3.9
+const MAX_NAME_FONT_SIZE = 8.05
+const FLOOR_NAME_FONT_SIZE = 2.5
 const FONT_SHRINK_STEP = 0.25
 const COUNT_FONT_RATIO = 0.75
 
@@ -52,7 +52,7 @@ const NAME_WIDTH_FRACTION = 0.82
 
 // Bubbles smaller than this (radius, in the same user units as MIN/MAX
 // RADIUS) don't get any text at all — there's no room to wrap into.
-const MIN_RADIUS_FOR_TEXT = 9
+const MIN_RADIUS_FOR_TEXT = 10.4
 
 // How many steps to advance the force simulation before anything is drawn,
 // so bubbles appear already settled instead of visibly jiggling into place.
