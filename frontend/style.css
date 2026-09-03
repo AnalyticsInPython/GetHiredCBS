@@ -265,7 +265,7 @@ main {
 }
 
 .canvas-wrap {
-  max-width: 1200px;
+  max-width: 704px;
   margin: 0.75rem auto;
   position: relative;
   background: var(--panel);
@@ -288,7 +288,7 @@ main {
 }
 
 .legend-caption {
-  max-width: 1200px;
+  max-width: 704px;
   margin: 0 auto;
   padding: 0.3rem 0 1.5rem;
   font-size: 0.8rem;

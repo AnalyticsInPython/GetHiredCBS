@@ -23,15 +23,15 @@ let activeIndustry = 'all'
 // render it as the first palette color, regardless of its real industry).
 let globalColorScale = null
 
-const MIN_RADIUS = 4
-const MAX_RADIUS = 34
+const MIN_RADIUS = 3.3
+const MAX_RADIUS = 26.4
 const BUBBLE_DISPLAY_LIMIT = 25
 
 // One fixed font size for every bubble — names that don't fit wrap onto
 // additional lines instead of shrinking, so text weight/size stays
 // consistent across the whole chart.
-const NAME_FONT_SIZE = 5
-const COUNT_FONT_SIZE = 4
+const NAME_FONT_SIZE = 4
+const COUNT_FONT_SIZE = 3.3
 const LINE_HEIGHT = NAME_FONT_SIZE * 1.2
 const MAX_NAME_LINES = 3
 
@@ -41,7 +41,11 @@ const NAME_WIDTH_FRACTION = 0.82
 
 // Bubbles smaller than this (radius, in the same user units as MIN/MAX
 // RADIUS) don't get any text at all — there's no room to wrap into.
-const MIN_RADIUS_FOR_TEXT = 9
+const MIN_RADIUS_FOR_TEXT = 7.2
+
+// How many steps to advance the force simulation before anything is drawn,
+// so bubbles appear already settled instead of visibly jiggling into place.
+const SETTLE_ITERATIONS = 300
 
 // One color per industry — 11 swatches for the 11 industries the data
 // actually has, so none has to repeat (a shorter list cycles and silently
@@ -109,31 +113,50 @@ function render(companies) {
 
   // The single largest bubble is fixed dead center (d3's fx/fy exempt a node
   // from every force below); every other bubble stays fully mobile, so the
-  // rest settle and jiggle around it under collision/repulsion rather than
-  // snapping to fixed slots.
+  // rest settle around it under collision/repulsion rather than snapping to
+  // fixed slots.
   const anchor = nodes[0]
   anchor.fx = 0
   anchor.fy = 0
 
-  // Size the view so its own area is a fixed multiple of total bubble area
-  // (packing-density target ~1/PACKING_LOOSENESS).
-  const PACKING_LOOSENESS = 1.08
-  const totalArea = d3.sum(nodes, (d) => Math.PI * d.r ** 2)
-  const half = Math.max(45, Math.min(200, 0.5 * Math.sqrt(PACKING_LOOSENESS * totalArea)))
-  const viewSize = half * 2
+  // Run the force simulation fully to convergence *before* anything is
+  // appended to the DOM, so bubbles appear already in their settled
+  // positions instead of visibly jiggling into place.
+  simulation = d3
+    .forceSimulation(nodes)
+    .force('x', d3.forceX(0).strength(0.18))
+    .force('y', d3.forceY(0).strength(0.22))
+    .force('charge', d3.forceManyBody().strength(18))
+    .force('collide', d3.forceCollide((d) => d.r + 0.5).iterations(6))
+    .stop()
+  for (let i = 0; i < SETTLE_ITERATIONS; i++) simulation.tick()
+
+  // Fit the view to the bubbles' actual (non-square) bounding box, and
+  // derive the SVG's pixel height from that box's aspect ratio against the
+  // container's real width — so the displayed aspect always matches the
+  // viewBox and the browser never has to letterbox with blank space.
+  const PAD = 4
+  const minX = d3.min(nodes, (d) => d.x - d.r) - PAD
+  const maxX = d3.max(nodes, (d) => d.x + d.r) + PAD
+  const minY = d3.min(nodes, (d) => d.y - d.r) - PAD
+  const maxY = d3.max(nodes, (d) => d.y + d.r) + PAD
+  const boxWidth = maxX - minX
+  const boxHeight = maxY - minY
+  const containerWidth = containerEl.clientWidth || boxWidth
 
   const svg = d3
     .select(containerEl)
     .append('svg')
-    .attr('viewBox', `${-half} ${-half} ${viewSize} ${viewSize}`)
+    .attr('viewBox', `${minX} ${minY} ${boxWidth} ${boxHeight}`)
     .attr('width', '100%')
-    .attr('height', viewSize)
+    .attr('height', containerWidth * (boxHeight / boxWidth))
 
   node = svg
     .selectAll('g.bubble')
     .data(nodes, (d) => d.company_name)
     .join('g')
     .attr('class', 'bubble')
+    .attr('transform', (d) => `translate(${d.x},${d.y})`)
     .style('cursor', 'pointer')
     .on('click', (event, d) => openPanel(d, colorScale))
 
@@ -285,6 +308,8 @@ function render(companies) {
         .attr('height', containerWidth * (boxHeight / boxWidth))
       node.attr('transform', (d) => `translate(${d.x},${d.y})`)
     })
+
+  applyDimming()
 }
 
 function openPanel(d, colorScale) {
@@ -330,41 +355,21 @@ function renderChips(companies) {
   }
 }
 
-// Matching companies against the search/industry filters, out of the full
-// list — not just whatever happened to already be on screen — so a search
-// can surface smaller companies that never made the initial top-25 cut.
-// Still capped to BUBBLE_DISPLAY_LIMIT, but only when the filtered result
-// itself is over that limit (i.e. no filter active), never below it.
-function computeVisibleCompanies() {
+// Filters by dimming bubbles in place, rather than re-running the
+// simulation, so the layout stays stable while the user types or clicks a
+// chip — matching/non-matching bubbles are just toggled visually.
+function applyDimming() {
+  if (!node) return
   const search = searchEl.value.trim().toLowerCase()
-  const matches = allCompanies.filter((c) => {
-    const matchesSearch = !search || c.company_name.toLowerCase().startsWith(search)
-    const matchesIndustry = activeIndustry === 'all' || c.industry === activeIndustry
-    return matchesSearch && matchesIndustry
+  let anyVisible = false
+
+  node.classed('dim', (d) => {
+    const matchesSearch = !search || d.company_name.toLowerCase().startsWith(search)
+    const matchesIndustry = activeIndustry === 'all' || d.industry === activeIndustry
+    const match = matchesSearch && matchesIndustry
+    if (match) anyVisible = true
+    return !match
   })
-  return matches.length > BUBBLE_DISPLAY_LIMIT
-    ? matches.slice().sort((a, b) => b.alumni_count - a.alumni_count).slice(0, BUBBLE_DISPLAY_LIMIT)
-    : matches
-}
-
-// Re-renders with just the matching companies — non-matching bubbles are
-// actually removed, not dimmed, so a search/chip filter can bring a small
-// company's bubble into existence rather than just toggling visibility on
-// whatever bubbles already happened to be on screen.
-function applyFilter() {
-  const visible = computeVisibleCompanies()
-
-  if (visible.length === 0) {
-    if (simulation) simulation.stop()
-    containerEl.replaceChildren()
-    containerEl.hidden = true
-    statusEl.hidden = true
-    panelEl.classList.remove('show')
-    node = null
-    renderedNodes = []
-    emptyStateEl.classList.add('show')
-    return
-  }
 
   emptyStateEl.classList.remove('show')
   render(visible)
