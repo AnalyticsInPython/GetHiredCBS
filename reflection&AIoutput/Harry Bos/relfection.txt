@@ -1,0 +1,17 @@
+There were a few things that went awry with the project. To start with we
+could not use the real data since it was locked behind a read only excel sheet.
+Instead we used a python script to mock the data in the excel.  This produced
+the desired result and we were able to proceed.  
+
+When starting the project I had thought finding free APIs to populate current jobs
+and company data would be difficult to find.  However, that turned out not to be
+a very big issue.  The APIs work but they have poor documentation so we could not
+find the correct company name required by the API for some of our pages.
+We were unable to resolve this.  If I was to continue to iterate on this project
+I would use different APIs or contact the providers to get the correct query strings.
+
+Another problem we had was attempting to segregate the work when working on such a small project.
+The team was too big for the codebase and the feature count.  After we had a decent base
+it was a bit easier to divy out the work. 
+
+All in all, the project went well and I am happy with the result.
